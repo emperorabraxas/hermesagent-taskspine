@@ -7,10 +7,9 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=%h/hermesagent-taskspine
 Environment=HERMES_ENABLE_PROJECT_PLUGINS=1
-ExecStart=%h/hermesagent-taskspine/venv/bin/python %h/hermesagent-taskspine/gateway/run.py
+ExecStart=%h/hermesagent-taskspine/hermes gateway run --replace
 Restart=on-failure
 RestartSec=2
 
 [Install]
 WantedBy=default.target
-

@@ -14,4 +14,5 @@ Docs:
 
 Project plugin (optional):
 - `.hermes/plugins/taskspine/` (enable with `HERMES_ENABLE_PROJECT_PLUGINS=1`)
-- Command: `hermes taskspine models suggest --include-ollama`
+- Suggest command (leaderboard-first): `hermes taskspine models suggest --include-ollama`
+- Default leaderboard dataset: `OpenEvals/leaderboard-data` (coding=`sweVerified_score`, tool-use=`terminalBench_score`, chat=`aggregate_score`)

@@ -48,6 +48,31 @@ If you prefer the upstream default routing (multiple routes), omit `path_templat
 
 Locally, Hermes can listen on HTTP, but GitHub requires HTTPS. Use a tunnel (Cloudflare Tunnel, ngrok, etc.) to terminate HTTPS and forward to your local port.
 
+### Run on your box (recommended: Cloudflare Tunnel)
+
+If you want the webhook to terminate on **your machine** (this box), run the gateway and expose it with Cloudflare Tunnel:
+
+1) Start Hermes gateway (webhook platform enabled in `config.yaml`):
+
+`hermes gateway run --replace`
+
+2) Expose HTTPS → local HTTP:
+
+- Point the tunnel to `http://127.0.0.1:8644` (or whatever you set as `platforms.webhook.extra.port`)
+- Set your GitHub webhook URL to the public hostname + your chosen path:
+  - fixed path mode: `https://YOUR_HOSTNAME/github/webhook`
+  - route path mode: `https://YOUR_HOSTNAME/webhooks/github`
+
+If you use fixed path mode, set:
+
+```yaml
+platforms:
+  webhook:
+    extra:
+      path_template: /github/webhook
+      default_route: github
+```
+
 ## Create the GitHub webhook (via `gh`)
 
 Use:
@@ -58,4 +83,3 @@ Use:
 
 - Hermes validates HMAC using `X-Hub-Signature-256` (`sha256=<hex>`).
 - Keep the secret out of git history. Use environment variables or a secret manager.
-

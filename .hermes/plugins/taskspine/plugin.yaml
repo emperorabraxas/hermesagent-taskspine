@@ -1,0 +1,8 @@
+name: taskspine
+version: 0.1.0
+description: "Taskspine customizations: lane routing + benchmark-first local model suggestion"
+author: "emperorabraxas"
+requires_env: []
+provides_tools: []
+provides_hooks: []
+

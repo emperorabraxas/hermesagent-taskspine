@@ -69,6 +69,12 @@ class WebhookAdapter(BasePlatformAdapter):
         self._host: str = config.extra.get("host", DEFAULT_HOST)
         self._port: int = int(config.extra.get("port", DEFAULT_PORT))
         self._global_secret: str = config.extra.get("secret", "")
+        self._path_template: str = str(
+            config.extra.get("path_template", "/webhooks/{route_name}")
+        ).strip() or "/webhooks/{route_name}"
+        if not self._path_template.startswith("/"):
+            self._path_template = f"/{self._path_template}"
+        self._default_route: str = str(config.extra.get("default_route", "")).strip()
         self._static_routes: Dict[str, dict] = config.extra.get("routes", {})
         self._dynamic_routes: Dict[str, dict] = {}
         self._dynamic_routes_mtime: float = 0.0
@@ -124,7 +130,15 @@ class WebhookAdapter(BasePlatformAdapter):
 
         app = web.Application()
         app.router.add_get("/health", self._handle_health)
-        app.router.add_post("/webhooks/{route_name}", self._handle_webhook)
+        if "{route_name}" in self._path_template:
+            app.router.add_post(self._path_template, self._handle_webhook)
+        else:
+            if not self._default_route:
+                raise ValueError(
+                    "[webhook] platforms.webhook.extra.path_template is a fixed path, "
+                    "but platforms.webhook.extra.default_route is not set."
+                )
+            app.router.add_post(self._path_template, self._handle_webhook)
 
         # Port conflict detection — fail fast if port is already in use
         import socket as _socket
@@ -145,9 +159,10 @@ class WebhookAdapter(BasePlatformAdapter):
 
         route_names = ", ".join(self._routes.keys()) or "(none configured)"
         logger.info(
-            "[webhook] Listening on %s:%d — routes: %s",
+            "[webhook] Listening on %s:%d%s — routes: %s",
             self._host,
             self._port,
+            self._path_template,
             route_names,
         )
         return True
@@ -241,6 +256,13 @@ class WebhookAdapter(BasePlatformAdapter):
         """GET /health — simple health check."""
         return web.json_response({"status": "ok", "platform": "webhook"})
 
+    def _resolve_route_name(self, request: "web.Request") -> str:
+        route_name = request.match_info.get("route_name", "")
+        route_name = (route_name or "").strip()
+        if route_name:
+            return route_name
+        return self._default_route
+
     def _reload_dynamic_routes(self) -> None:
         """Reload agent-created subscriptions from disk if the file changed."""
         from hermes_constants import get_hermes_home
@@ -275,11 +297,11 @@ class WebhookAdapter(BasePlatformAdapter):
             logger.error("[webhook] Failed to reload dynamic routes: %s", e)
 
     async def _handle_webhook(self, request: "web.Request") -> "web.Response":
-        """POST /webhooks/{route_name} — receive and process a webhook event."""
+        """Receive and process a webhook event."""
         # Hot-reload dynamic subscriptions on each request (mtime-gated, cheap)
         self._reload_dynamic_routes()
 
-        route_name = request.match_info.get("route_name", "")
+        route_name = self._resolve_route_name(request)
         route_config = self._routes.get(route_name)
 
         if not route_config:

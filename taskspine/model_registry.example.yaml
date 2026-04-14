@@ -1,0 +1,13 @@
+# Taskspine model registry (example)
+#
+# This maps your *local* low-tier model names (e.g. Ollama tags) to Hugging Face
+# repo IDs so Hermes can pull benchmark results from HF `model-index`.
+#
+# NOTE: "best model" is chosen from benchmark metrics only (no likes/downloads).
+
+low_tier_candidates:
+  - name: "qwen2.5-coder:7b-instruct-q4_K_M"
+    hf: "Qwen/Qwen2.5-Coder-7B-Instruct"
+  - name: "llama3.1:8b-instruct-q4_K_M"
+    hf: "meta-llama/Meta-Llama-3.1-8B-Instruct"
+

@@ -288,6 +288,15 @@ def resolve_latest_openai_model(api_key: Optional[str], base_url: str = "https:/
 
 def build_taskspine_routing_context() -> str:
     """Return a short routing policy block for injection via pre_llm_call."""
+    def classify_task(task: str) -> str:
+        t = (task or "").lower()
+        # Cheap heuristics: if in doubt, treat as general chat.
+        if any(k in t for k in ("bug", "fix", "refactor", "implement", "patch", "pr", "pull request", "repo", "code", "tests", "pytest", "build", "compile")):
+            return "coding"
+        if any(k in t for k in ("tool", "webhook", "github", "api", "mcp", "terminal", "shell", "command", "aws", "cloudflare", "tunnel", "deploy")):
+            return "tool-use"
+        return "general chat"
+
     # Webhook URL is user-controlled; keep it explicit.
     webhook_url = os.environ.get("TASKSPINE_WEBHOOK_PUBLIC_URL", "").strip()
 
@@ -305,6 +314,19 @@ def build_taskspine_routing_context() -> str:
     system = detect_system_profile()
 
     lb_index, lb_err, lb_rows = _get_leaderboard_index(dataset, config, split, hf_token)
+
+    user_task = os.environ.get("TASKSPINE_USER_TASK", "").strip()
+    # If we're running inside Hermes, user_message is passed via pre_llm_call hook.
+    # We fall back to an env var to support CLI debugging.
+    task_type = classify_task(user_task) if user_task else "general chat"
+
+    if task_type == "coding":
+        w_coding, w_tool, w_chat = 1.0, 0.35, 0.15
+    elif task_type == "tool-use":
+        w_coding, w_tool, w_chat = 0.35, 1.0, 0.15
+    else:
+        w_coding, w_tool, w_chat = 0.25, 0.25, 1.0
+
     low_model = os.environ.get("TASKSPINE_LOW_MODEL", "").strip() or None
     if not low_model and candidates and lb_index:
         # Prefer models that match the leaderboard; otherwise just pick the first installed.
@@ -314,11 +336,17 @@ def build_taskspine_routing_context() -> str:
             lb, _ = _leaderboard_scores_for_candidate(c, lb_index, coding_metric, tool_metric, chat_metric)
             if not lb:
                 continue
-            # Default: equal weights.
-            parts = [v for v in (lb.get("coding"), lb.get("tool_use"), lb.get("general_chat")) if isinstance(v, (int, float))]
+            parts: List[Tuple[float, float]] = []
+            if lb.get("coding") is not None:
+                parts.append((w_coding, float(lb["coding"])))
+            if lb.get("tool_use") is not None:
+                parts.append((w_tool, float(lb["tool_use"])))
+            if lb.get("general_chat") is not None:
+                parts.append((w_chat, float(lb["general_chat"])))
             if not parts:
                 continue
-            score = sum(float(x) for x in parts) / float(len(parts))
+            denom = sum(w for w, _ in parts) or 1.0
+            score = sum(w * s for w, s in parts) / denom
             if best_score is None or score > best_score:
                 best_score = score
                 best_name = c["name"]
@@ -350,6 +378,7 @@ def build_taskspine_routing_context() -> str:
     lines.append(f"- System: CPU-only, ~{system.mem_total_gib:.1f} GiB RAM.")
     if webhook_url:
         lines.append(f"- GitHub webhook URL (public HTTPS): {webhook_url}")
+    lines.append(f"- Task type heuristic: {task_type} (weights: coding={w_coding}, tool-use={w_tool}, chat={w_chat}).")
     lines.append("- Low lane (local): use delegate_task with base_url/model for cheap drafting.")
     if low_model:
         lines.append(f"  - base_url={low_base_url} model={low_model} (leaderboard={dataset})")
@@ -362,6 +391,7 @@ def build_taskspine_routing_context() -> str:
     lines.append("- High lane (execute): Claude Code via ACP on Opus 4.6 (1M ctx).")
     lines.append(f"  - delegate_task(acp_command={high_acp_cmd}, acp_args={acp_args})")
     lines.append("- Rules: benchmark-first for low model; never likes/downloads.")
+    lines.append("- Suggested flow: low lane drafts → mid lane reviews (toolsets=['read_only','web']) → high lane executes (ACP).")
 
     return "\n".join(lines)
 
@@ -661,9 +691,13 @@ def _handle_taskspine_cmd(args) -> None:
 
 
 def register(ctx) -> None:
-    def _pre_llm_call_hook(**_kwargs):
+    def _pre_llm_call_hook(**kwargs):
         # Keep this short; any heavy lifting is cached.
         try:
+            user_message = kwargs.get("user_message")
+            if isinstance(user_message, str) and user_message.strip():
+                # Used by build_taskspine_routing_context() classifier.
+                os.environ["TASKSPINE_USER_TASK"] = user_message.strip()
             return {"context": build_taskspine_routing_context()}
         except Exception as e:
             return {"context": f"[TASKSPINE ROUTING] (hook error: {e})"}

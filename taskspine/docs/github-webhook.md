@@ -9,7 +9,7 @@ GitHub requires a public HTTPS endpoint. You can pick any URL you control.
 Two common patterns:
 
 1) **Direct to your server / container**
-- Example: `https://spiders.wirelash.dev/github/webhook`
+- Example: `https://hooks.wirelash.dev/github/webhook`
 
 2) **Via a managed HTTPS edge (AWS)**
 - Example: API Gateway / ALB / CloudFront → your Hermes host

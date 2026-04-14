@@ -21,4 +21,3 @@ ingress:
   - hostname: hooks.wirelash.dev
     service: http://127.0.0.1:8644
   - service: http_status:404
-

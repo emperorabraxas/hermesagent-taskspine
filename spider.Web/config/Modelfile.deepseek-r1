@@ -1,0 +1,9 @@
+FROM deepseek-r1:7b
+
+# R1 is the validation gate + Money Maker primary — needs enough context
+# to review full responses (system prompt + user query + agent response)
+# 4.4GB model weights + ~0.8GB KV cache at 16K = 5.2GB total (fits 8GB VRAM)
+
+PARAMETER num_ctx 16384
+PARAMETER num_predict 4096
+PARAMETER num_gpu 99

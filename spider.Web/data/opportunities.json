@@ -1,0 +1,164 @@
+[
+  {
+    "source": "airdrop",
+    "name": "Coinbase Earn - Learning Rewards",
+    "potential_value": 30.0,
+    "url": "https://www.coinbase.com/earn",
+    "status": "open",
+    "notes": "Watch videos, earn crypto. ~$3-5 per course.",
+    "found_at": 1775947517.2530077
+  },
+  {
+    "source": "airdrop",
+    "name": "Layer3 Quests",
+    "potential_value": 20.0,
+    "url": "https://layer3.xyz",
+    "status": "open",
+    "notes": "Complete onchain quests for token rewards.",
+    "found_at": 1775947517.2531366
+  },
+  {
+    "source": "airdrop",
+    "name": "Galxe Campaigns",
+    "potential_value": 15.0,
+    "url": "https://galxe.com",
+    "status": "open",
+    "notes": "Social + onchain tasks for NFTs/tokens.",
+    "found_at": 1775947517.2532392
+  },
+  {
+    "source": "airdrop",
+    "name": "Testnet Farming",
+    "potential_value": 50.0,
+    "url": "",
+    "status": "open",
+    "notes": "Interact with testnets (Monad, Berachain, etc.) for potential airdrops.",
+    "found_at": 1775947517.2533228
+  },
+  {
+    "source": "dfs",
+    "name": "DraftKings Free Contests",
+    "potential_value": 25.0,
+    "url": "https://www.draftkings.com",
+    "status": "open",
+    "notes": "Free-entry contests daily. NFL/NBA/MLB.",
+    "found_at": 1775947517.2534032
+  },
+  {
+    "source": "dfs",
+    "name": "FanDuel Free Contests",
+    "potential_value": 25.0,
+    "url": "https://www.fanduel.com",
+    "status": "open",
+    "notes": "Free-entry contests with real prizes.",
+    "found_at": 1775947517.2534838
+  },
+  {
+    "source": "dfs",
+    "name": "PrizePicks Free Entries",
+    "potential_value": 15.0,
+    "url": "https://www.prizepicks.com",
+    "status": "open",
+    "notes": "Free pick'em entries periodically.",
+    "found_at": 1775947517.2535646
+  },
+  {
+    "source": "dfs",
+    "name": "Underdog Fantasy Free",
+    "potential_value": 15.0,
+    "url": "https://underdogfantasy.com",
+    "status": "open",
+    "notes": "Free best-ball and pick'em contests.",
+    "found_at": 1775947517.2536461
+  },
+  {
+    "source": "sportsbook",
+    "name": "DraftKings Sportsbook Signup",
+    "potential_value": 200.0,
+    "url": "https://sportsbook.draftkings.com",
+    "status": "open",
+    "notes": "Bet $5 get $200 in bonus bets. Free money.",
+    "found_at": 1775947517.2537308
+  },
+  {
+    "source": "sportsbook",
+    "name": "FanDuel Sportsbook Signup",
+    "potential_value": 200.0,
+    "url": "https://sportsbook.fanduel.com",
+    "status": "open",
+    "notes": "Bet $5 get $200 in bonus bets.",
+    "found_at": 1775947517.2538223
+  },
+  {
+    "source": "sportsbook",
+    "name": "BetMGM Signup Bonus",
+    "potential_value": 158.0,
+    "url": "https://sports.betmgm.com",
+    "status": "open",
+    "notes": "$158 bonus bet on signup.",
+    "found_at": 1775947517.2539191
+  },
+  {
+    "source": "sportsbook",
+    "name": "Caesars First Bet",
+    "potential_value": 100.0,
+    "url": "https://www.caesars.com/sportsbook-and-casino",
+    "status": "open",
+    "notes": "First bet insurance up to $1000.",
+    "found_at": 1775947517.2540145
+  },
+  {
+    "source": "referral",
+    "name": "Coinbase Referrals",
+    "potential_value": 50.0,
+    "url": "",
+    "status": "open",
+    "notes": "$10 per referral. 5 friends = $50.",
+    "found_at": 1775947517.2541058
+  },
+  {
+    "source": "referral",
+    "name": "Cash App Referrals",
+    "potential_value": 25.0,
+    "url": "",
+    "status": "open",
+    "notes": "$5 per referral.",
+    "found_at": 1775947517.2541964
+  },
+  {
+    "source": "referral",
+    "name": "Webull Signup + Referral",
+    "potential_value": 75.0,
+    "url": "https://www.webull.com",
+    "status": "open",
+    "notes": "Free stocks on signup + referral bonuses.",
+    "found_at": 1775947517.2542882
+  },
+  {
+    "source": "credit_card",
+    "name": "Discover It Cashback Match",
+    "potential_value": 150.0,
+    "url": "",
+    "status": "open",
+    "notes": "All cashback doubled first year. $0 annual fee.",
+    "found_at": 1775947517.2543814
+  },
+  {
+    "source": "credit_card",
+    "name": "Chase Freedom Flex",
+    "potential_value": 200.0,
+    "url": "",
+    "status": "open",
+    "notes": "$200 bonus after $500 spend in 3 months. $0 annual fee.",
+    "found_at": 1775947517.254474
+  },
+  {
+    "source": "credit_card",
+    "name": "Capital One Quicksilver",
+    "potential_value": 200.0,
+    "url": "",
+    "status": "open",
+    "notes": "$200 bonus after $500 spend. 1.5% unlimited cashback.",
+    "found_at": 1775947517.2546375
+  }
+]

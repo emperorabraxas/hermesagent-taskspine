@@ -1,0 +1,248 @@
+# Salesforce Domain Knowledge — Nexa Mortgage / UWM Integration
+# Hard-learned lessons that prevent the spiders from hitting the same traps.
+# Sourced from production incidents, LO walkthroughs, and deploy failures.
+
+knowledge:
+
+  cmdt:
+    - title: "CMDT XML MUST declare xmlns:xsd explicitly"
+      severity: critical
+      content: |
+        Custom Metadata Type record files (.md-meta.xml) MUST declare
+        xmlns:xsd="http://www.w3.org/2001/XMLSchema" in the root <CustomMetadata> element.
+        Without it, Salesforce rejects with UNKNOWN_EXCEPTION before any component validation.
+        The error gives zero diagnostic signal. Salesforce's own docs OMIT this declaration.
+      fix: |
+        Every <CustomMetadata> root element must include:
+          <CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata"
+                          xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        This is because <value xsi:type="xsd:string"> requires the xsd prefix to be bound.
+
+    - title: "CMDT field values use xsi:type declarations"
+      severity: medium
+      content: |
+        Every <value> element in a CMDT record needs xsi:type="xsd:boolean", "xsd:string",
+        or "xsd:double" matching the field type. Mismatched types deploy silently but return
+        null at runtime.
+
+  deploy:
+    - title: "Scope test runs around UwmLoanCreateControllerTest"
+      severity: high
+      content: |
+        UwmLoanCreateControllerTest references a non-existent Result inner class in
+        UwmLoanCreateController (only ReadinessResult exists). Any deploy that runs
+        all local tests will fail. Always use --test-level RunSpecifiedTests --tests
+        with your actual test classes until this is fixed.
+      fix: "Use --test-level RunSpecifiedTests --tests <your-test> for all deploys."
+
+    - title: "Source-dir retrieve only refreshes existing files"
+      severity: medium
+      content: |
+        sf project retrieve start --source-dir force-app only updates files already
+        present locally. To pull NEW metadata not yet in your project, you must use
+        -m (metadata type) flag: sf project retrieve start -m ApexClass:NewClass
+      fix: "Use -m flag for new components, --source-dir for syncing existing ones."
+
+    - title: "Deploy timeout — use 300s for large metadata sets"
+      severity: low
+      content: |
+        Default sf deploy wait is 33 minutes but the shell sandbox times out at 120s.
+        The SalesforceTool uses a 300s sandbox timeout. For very large deploys, consider
+        deploying in batches (LWC bundle, then Apex, then CMDT).
+
+  lwc:
+    - title: "@wire does not fire reliably in modals/quick actions"
+      severity: high
+      content: |
+        @wire(getRecord) and @wire(getObjectInfo) do NOT fire reliably when an LWC
+        is rendered inside a screen quick action modal. The component mounts before
+        the record context is injected. This caused createLoanAction and createInUwmAction
+        spinners to stick indefinitely.
+      fix: |
+        Add connectedCallback() with an imperative Apex call as fallback:
+          connectedCallback() { this._loadData(); }
+        Don't rely solely on @wire in modal context.
+
+    - title: "LWC @wire doesn't re-fire when dependent params aren't tracked inputs"
+      severity: high
+      content: |
+        If a @wire depends on a property that changes but isn't a tracked @api or
+        @track property, the wire won't re-fire. This caused the pricing workspace
+        to not refresh when the LO switched Loan Program.
+      fix: |
+        Clear derived state manually in the change handler:
+          handleChange(e) { this.options = undefined; this.bestOption = undefined; }
+        And show a "re-quote required" hint.
+
+    - title: "refreshApex requires the original wire result reference"
+      severity: medium
+      content: |
+        refreshApex(this.wiredResult) only works if you store the full wire result
+        (not just .data). Pattern: @wire(myApex) wiredResult; then use
+        this.wiredResult.data in the template and refreshApex(this.wiredResult) to refresh.
+
+    - title: "LWC CSS shadow DOM isolation"
+      severity: low
+      content: |
+        LWC components have shadow DOM CSS isolation. Global styles don't penetrate.
+        Use CSS custom properties (--lwc-*) or SLDS design tokens for theming.
+        lightning-card and other base components have their own shadow boundaries.
+
+  apex:
+    - title: "REST endpoints must be 'without sharing' for Integration licenses"
+      severity: critical
+      content: |
+        The Connected App Run As user (aws-uwm-stage@nexalending.com) is on a
+        Salesforce Integration license that CANNOT edit standard objects via permission
+        sets. All REST endpoints called by Lambda (UwmConditionsSyncRest,
+        UwmDateTrackingSyncRest, UwmLoanImportSyncRest, UwmLoanExportSyncRest)
+        MUST use 'without sharing' so DML executes in system context.
+      fix: "Always declare 'without sharing' on Apex REST classes invoked by integration users."
+
+    - title: "DML-before-callout — use Queueable for async callouts"
+      severity: high
+      content: |
+        If Apex does DML (insert, update) and then tries an HTTP callout in the same
+        transaction, you get "uncommitted work pending" error. nexaDocUploader hit this
+        when doing PDF conversion after file upload.
+      fix: |
+        Move the callout to a Queueable: System.enqueueJob(new PdfConversionJob(recordId));
+        The Queueable gets its own transaction context.
+
+    - title: "Apex Class Access must be granted in permission sets"
+      severity: medium
+      content: |
+        REST endpoints are not accessible by default. The Apex Class must be added to
+        a permission set (UWM_Integration_User) and that permset assigned to the
+        Connected App Run As user. Missing this causes 403s with no useful error message.
+
+    - title: "Override-merge pattern — read overrides BEFORE computing derived values"
+      severity: high
+      content: |
+        When LWC sends scenarioParams overrides that Apex merges with Opp fields,
+        the merge must happen BEFORE any derived computation. The FHA->Conventional
+        bug happened because buildUwmScenario computed loanTypeIds from opp.Loan_Program__c
+        BEFORE merging the LWC override.
+      fix: "Merge overrides first, then compute derived values from the merged state."
+
+  testing:
+    - title: "Passing tests does NOT mean shippable"
+      severity: critical
+      content: |
+        For LO-facing Salesforce UI, 100% Apex/Jest test pass rate means nothing about
+        production readiness. The 2026-04-08 LO walkthrough surfaced 7 bugs that all
+        automated tests passed through: origination-fee-as-points conflation, FHA->Conv
+        silent override, no-refresh-on-program-change, ugly EASE Hub UI, dead-variable
+        address copy flow, manual-only loan status sync, missing panel on layout.
+      fix: "Always do a manual LO walkthrough before declaring any UI feature done."
+
+    - title: "Type-correct numbers can be semantically wrong"
+      severity: high
+      content: |
+        Financial UI math bugs are insidious — a field that shows 1.5 (correct type,
+        renders fine, test passes) might be showing origination fee when it should show
+        discount points. Tests validate data type and presence, not business meaning.
+      fix: "When testing financial calculations, verify the semantic meaning, not just the value type."
+
+    - title: "Float/Lock replay must use cached Scenario_JSON__c"
+      severity: medium
+      content: |
+        Float and Lock operations must replay the exact scenario that was originally priced.
+        Building a scenario from bare Opp fields produces different results because the LO
+        may have changed fields since pricing. Always use Pricing_Run__c.Scenario_JSON__c.
+
+  uwm_api:
+    - title: "V8 API has different loanTypeIds"
+      severity: high
+      content: |
+        UWM Pricing API V8 swapped some loanTypeIds: USDA is now '5', VA ARM is now '6'.
+        The pricing-orchestrator Lambda handles this in handlePriceQuote.
+      fix: "Use the V8 mapping: { Conventional: '1', FHA: '2', VA: '3', USDA: '5', VA_ARM: '6' }"
+
+    - title: "V8 auth uses client_credentials grant (no password)"
+      severity: medium
+      content: |
+        V8 pricing endpoint uses OAuth client_credentials grant type — no username/password
+        needed. The Lambda getAccessToken function supports both grant types and tries
+        client_credentials first.
+
+    - title: "Cash Out value must be exact string"
+      severity: medium
+      content: |
+        UWM V8 expects the exact string "Cash Out / Other" for cash-out refinances.
+        Any other value (e.g., "CashOut", "Cash-Out") returns empty results silently.
+
+    - title: "AUS uses auth-code flow — blocked on UWM credentials"
+      severity: high
+      content: |
+        Unlike other UWM APIs that use client_credentials, the AUS API requires OAuth
+        authorization-code flow with a callback URL. UWM has not yet issued credentials
+        or enabled the callback endpoint. Code is built and mocked-tested but has never
+        run against a live endpoint.
+
+    - title: "HELOC routes as Broker with loanOriginatorType=Broker"
+      severity: medium
+      content: |
+        HELOC pricing goes through a different UWM endpoint (heloc-pricequote action)
+        and requires loanOriginatorType=Broker. The LWC stamps Loan_Program__c='HELOC'
+        and the forceHeloc param triggers Broker routing.
+
+  org_config:
+    - title: "OAuth URLs must use salesforce.com, not salesforce-setup.com"
+      severity: critical
+      content: |
+        Secrets Manager URL values for Salesforce OAuth MUST use the My Domain URL
+        (https://ruby-ability-5007--joedev.sandbox.my.salesforce.com), not the setup
+        domain (salesforce-setup.com). Setup domains cannot serve OAuth tokens.
+
+    - title: "State/Country picklists are enabled — use sub-fields"
+      severity: medium
+      content: |
+        The org has State/Country picklists enabled. Address fields have sub-fields:
+        __StateCode__s, __CountryCode__s. Standard State/Country fields are read-only.
+        Always write to the code sub-fields.
+
+    - title: "Default org is joedev sandbox"
+      severity: low
+      content: |
+        Default target org: joedev (alias) -> jdemasse@nexamortgage.com
+        Instance: https://ruby-ability-5007--joedev.sandbox.my.salesforce.com
+        API Version: 66.0
+
+    - title: "9 user profiles created — all Standard User base"
+      severity: low
+      content: |
+        Profiles: JLOA, LOA, LO, hybridJLOA-LOA, hybridLOA-LO, Sales Director,
+        Processor, Pipeline Director, Closer. All extend Standard User permissions.
+        Custom permissions: Pricing_Admin (gates BPS fields), Document_Review_Ops
+        (gates review toggle).
+
+  known_bugs:
+    - title: "FICO magic string in pricingWorkspace.js"
+      severity: low
+      content: |
+        pricingWorkspace.js line 22 + html line 45 use magic string 'FICO_FIELD'
+        instead of schema import Opportunity.FICO_Score__c. handleChange FICO edits
+        silently no-op. handleSaveScenario uses schema import correctly so saves work.
+      fix: "Replace 'FICO_FIELD' with imported schema reference."
+
+    - title: "createLoanAction @wire doesn't fire in quick action modal"
+      severity: medium
+      content: |
+        createLoanAction Continue button stays disabled because @wire(getRecord)
+        doesn't fire in modal context.
+      fix: "Add connectedCallback() { this._checkReady(); } for imperative fallback."
+
+    - title: "createInUwmAction spinner stuck in modal"
+      severity: medium
+      content: |
+        Same @wire-in-modal issue as createLoanAction. Spinner never resolves.
+      fix: "Add connectedCallback() { this.refreshReadiness(); }"
+
+    - title: "Program_Name__c field too short for HELOC"
+      severity: low
+      content: |
+        Program_Name__c is Text(30) but HELOC product names can exceed this.
+        Needs extension to Text(80).
+      fix: "Update field metadata: Text(30) -> Text(80), redeploy."

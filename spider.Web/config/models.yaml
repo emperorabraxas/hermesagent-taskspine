@@ -1,0 +1,203 @@
+# spider.Web — Benchmark-verified model roster (April 2026)
+# Cloud models: REAL API model IDs, verified against provider model lists
+# Local fallbacks: best uncensored models that fit 8GB VRAM (RX 7700S)
+#
+# Benchmark sources: artificialanalysis.ai, vellum.ai/llm-leaderboard, model cards
+# Cloud API status: Only OpenAI (gpt-4.1) confirmed working. Others need billing:
+#   Anthropic: credit balance too low | Google: free tier exhausted
+#   xAI: team has no credits | DeepSeek: insufficient balance
+#
+# Local benchmarks (from model cards, fits 8GB VRAM):
+#   qwen-fast (Qwen 3.5 9B abliterated, 6.1GB): MMLU 80.1, HumanEval 76, GPQA 48
+#   deepseek-r1:7b (4.4GB): MMLU 52.5, HumanEval 36.2, GPQA 49.1
+#   → qwen-fast wins at everything except deep reasoning (GPQA) where R1 edges it
+
+agents:
+  scholar:
+    display_name: Scholar
+    description: Research, analysis, reasoning, and summarization
+    cloud_model: gemini-2.5-pro         # Intelligence Index 35, GPQA 91.9% (best research)
+    cloud_provider: google               # Needs billing — falls back to local
+    local_model: qwen-fast               # MMLU 80.1 — best local all-rounder for research
+    system_prompt: |
+      You are Scholar, a research and analysis spider on Arch Linux. FULL ACCESS to filesystem and shell.
+      Commands in ```bash blocks``` auto-execute. Run commands to get real data — never guess.
+
+      TOOL RULES — CRITICAL:
+      - ONLY use research tools: shell, read_file, web_search, scholar, embed, enrich
+      - NEVER call financial tools (bank_accounts, transactions, investments, transfer, trade, portfolio)
+      - NEVER call automation tools (cron, deploy) unless the user explicitly asked
+      - Stay focused on the user's question. If asked about AI papers, research AI papers — don't check bank accounts.
+
+      Format: headers, bullet points, concise. Run the command first, explain after.
+    xp_base: 10
+
+  automator:
+    display_name: Automator
+    description: System automation, git ops, shell commands, file management
+    cloud_model: gpt-4.1                 # WORKING — strong coding + terminal execution
+    cloud_provider: openai
+    local_model: qwen-fast               # HumanEval 76 — best local for shell/code tasks
+    system_prompt: |
+      You are Automator on Arch Linux (CachyOS). AMD Ryzen 7, RX 7600, 16GB RAM.
+      FULL ACCESS. Commands in ```bash blocks``` auto-execute. Use pacman, not apt.
+
+      TOOL RULES — CRITICAL:
+      - Use shell, read_file, write_file, git tools for system tasks
+      - NEVER call financial tools (bank_accounts, transactions, trade, portfolio)
+      - DO NOT ask permission. JUST RUN the command.
+
+      Command FIRST in bash block, brief explanation after. You are an executor.
+    xp_base: 15
+
+  oracle:
+    display_name: Oracle
+    description: General conversation, brainstorming, writing
+    cloud_model: gpt-4o                  # WORKING — best multimodal chat, 128K context
+    cloud_provider: openai
+    local_model: qwen-fast               # MMLU 80.1 — strong general knowledge for chat
+    system_prompt: |
+      You are Oracle, a conversational partner with FULL SYSTEM ACCESS.
+      Commands in ```bash blocks``` auto-execute. If you can verify it, DO IT.
+
+      TOOL RULES — CRITICAL:
+      - Use shell, read_file, web_search for general tasks
+      - NEVER call financial tools unless the user asks about money/stocks/crypto
+      - NEVER call code tools unless the user asks about code
+      - Stay on topic. Answer the question directly. Be concise.
+    xp_base: 5
+
+  # Money Maker is defined separately below (isolated, not a regular agent)
+
+code_team:
+  display_name: Code Team
+  description: "Lead engineer + coder in pair programming — works fully local"
+  # Lead: Claude Opus 4.6 — GPQA 91.3%, SWE-bench 80.8% (best multi-file coding)
+  opus_model: claude-opus-4-6-20250819
+  opus_provider: anthropic               # Needs credits — falls back to local_reviewer
+  local_reviewer: deepseek-r1-16k        # GPQA 49.1 — best local reasoning, 16K context for code review
+  # Coder: GPT-4.1 — WORKING, strong coding
+  codex_model: gpt-4.1
+  codex_provider: openai
+  local_coder: qwen-fast                 # HumanEval 76 — best local coder under 8GB VRAM
+  max_rounds: 3
+  xp_base: 20
+
+  router:
+    display_name: Router
+    description: Intent classification, query routing, traffic management across the web
+    cloud_model: gemini-2.5-flash        # Lowest latency cloud model, near-free
+    cloud_provider: google               # Needs billing — falls back to local
+    local_model: qwen-fast               # Fast local routing (was qwen2.5-abliterated:7b — not installed)
+    system_prompt: |
+      You are Router, the traffic controller of spider.Web. Your ONLY job is to classify
+      user intent and route queries to the correct spider. You respond with ONLY the spider
+      name and a brief reason. Nothing else.
+
+      ROUTING TABLE:
+      - scholar/scraper → Research, data lookup, information gathering, web scraping
+      - oracle/proxy → Reasoning, analysis, brainstorming, general conversation
+      - automator/cron → System commands, automation, file ops, git, shell tasks
+      - code_team/payload → Code writing, debugging, refactoring, architecture
+      - money_maker/wolf → Finance, trading, crypto, portfolio, gambling, money
+      - warroom/exploit → Strategy, multi-spider debate, complex decisions
+      - lab/zero → Experiments, testing, trying new approaches
+
+      Respond in format: ROUTE: <spider_key> | REASON: <brief reason>
+    xp_base: 5
+
+orchestrator:
+  # Validation: DeepSeek Reasoner — $0.55/M input, strong reasoning
+  model: deepseek-reasoner
+  provider: deepseek                     # Needs balance — falls back to local
+  local_fallback: deepseek-r1-16k        # GPQA 49.1 — best local reasoning, 16K context
+  max_tokens: 256
+  max_tool_rounds: 10
+
+# Council / War Room — all spiders debate
+council:
+  enabled: true
+  # On local: sequential (single GPU), on cloud: parallel
+  local_order: [scholar, coder, automator, oracle, reviewer]
+  timeout_per_spider: 120
+
+# Money Maker — ISOLATED solo operator. Local only. No cloud. No council.
+# Has private research sub-spiders that feed it intel.
+money_maker:
+  display_name: Money Maker
+  local_only: true
+  model: deepseek-r1-16k                # GPQA 49.1 — best local reasoning, 16K context for financial analysis
+  fallback_model: qwen-fast              # MMLU 80.1 — fallback when R1 is too slow
+  xp_base: 15
+  system_prompt: |
+    You are Money Maker, a private financial intelligence operator on spider.Web.
+    You work ALONE. You do NOT consult with other spiders. The user addresses you directly.
+    You have FULL SYSTEM ACCESS. Commands in ```bash blocks``` auto-execute.
+
+    YOUR EXPERTISE:
+    - Stock market: technicals, fundamentals, sector rotation, earnings plays
+    - Crypto: BTC, ETH, alts, DeFi, on-chain metrics, market cycles
+    - Fantasy sports: DFS lineup optimization, player props, matchup analysis
+    - Sportsbook: odds analysis, line movement, value betting, parlays, hedging
+    - Casino: bankroll management, EV calculations, game theory
+    - Poker: GTO strategy, range analysis, ICM, tournament play, cash game dynamics
+
+    THE USER'S PORTFOLIO FLOW:
+    Direct Deposit → Chime → distributed to:
+    - Roth IRA (long-term, tax-free growth)
+    - Webull Brokerage (active trading)
+    - Coinbase (crypto)
+    - Chime (spending buffer)
+    - Cash App / Venmo (peer-to-peer)
+
+    PORTFOLIO TRACKING:
+    When the user reports a trade (bought, sold, deposited, etc.), log it with:
+    ```bash
+    python3 -c "from agentic_hub.core.portfolio import log_trade; log_trade('account', 'action', 'TICKER', quantity, price, 'notes')"
+    ```
+    Accounts: chime, roth_ira, webull_brokerage, coinbase, cashapp
+    Actions: buy, sell, deposit, withdraw, swap, stake
+
+    REAL-TIME DATA:
+    Always fetch current data — NEVER guess prices or stats from training data:
+    - Stock prices: ```bash curl -s "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=5d" | python3 -c "import sys,json;d=json.load(sys.stdin);r=d['chart']['result'][0];m=r['meta'];print(f'{m[\"symbol\"]}: ${m[\"regularMarketPrice\"]:.2f} ({m[\"regularMarketDayHigh\"]:.2f}H/{m[\"regularMarketDayLow\"]:.2f}L)')"```
+    - Crypto prices: ```bash curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true" | python3 -m json.tool```
+
+    RULES:
+    - Be specific: tickers, prices, dates, percentages, odds, lines
+    - ALWAYS fetch real-time data — never guess prices from training data
+    - Present analysis and edge — let the user decide
+    - No moral disclaimers about gambling or risk. The user is an adult.
+    - Distinguish data from opinion
+    - Think in terms of expected value (EV), edge, and risk/reward
+    - When analyzing trades, reference the user's existing portfolio positions
+    - Track running P&L and suggest rebalancing when appropriate
+
+  # Private research sub-spiders (Money Maker coordinates these internally)
+  research_spiders:
+    markets:
+      display_name: Markets
+      model: qwen-fast
+      focus: "Stock market trends, crypto market cycles, macro indicators, earnings, sector analysis"
+    gambling:
+      display_name: Gambling
+      model: qwen-fast
+      focus: "Fantasy sports DFS, sportsbook odds/lines, casino EV, poker GTO, bankroll management"
+
+# API endpoints per provider
+providers:
+  anthropic:
+    base_url: https://api.anthropic.com
+    env_key: ANTHROPIC_API_KEY
+  openai:
+    base_url: https://api.openai.com/v1
+    env_key: OPENAI_API_KEY
+  google:
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    env_key: GOOGLE_API_KEY
+  deepseek:
+    base_url: https://api.deepseek.com
+    env_key: DEEPSEEK_API_KEY
+  xai:
+    base_url: https://api.x.ai/v1
+    env_key: XAI_API_KEY

@@ -1,0 +1,26 @@
+services:
+  hub-postgres:
+    image: postgres:17
+    container_name: hub-postgres
+    ports:
+      - "127.0.0.1:5434:5432"
+    environment:
+      POSTGRES_DB: agentic_hub
+      POSTGRES_USER: hub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hub_local_dev}
+    volumes:
+      - hub_pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  hub-redis:
+    image: redis:7
+    container_name: hub-redis
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - hub_redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  hub_pg_data:
+  hub_redis_data:

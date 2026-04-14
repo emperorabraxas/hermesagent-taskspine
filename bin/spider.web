@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# 🕸 spider.Web — launch from anywhere
+# Default: Tauri desktop app (dashboard) + TUI (chat)
+cd /home/bobbyblowssmoke/spider.Web
+source .venv/bin/activate
+
+# Start docker if not running
+docker compose up -d 2>/dev/null
+
+# Start server via systemd (survives terminal close)
+if ! curl -s http://localhost:8420/health >/dev/null 2>&1; then
+    echo "🕸 Starting spider.Web..."
+    systemctl --user start spider-web 2>/dev/null || {
+        uvicorn agentic_hub.main:app --host 127.0.0.1 --port 8420 &>/tmp/spider-web-server.log &
+    }
+    for i in $(seq 1 20); do
+        sleep 0.5
+        curl -s http://localhost:8420/health >/dev/null 2>&1 && break
+    done
+fi
+
+# Launch Tauri desktop dashboard (non-blocking)
+if [ -x "$HOME/bin/spider-web-desktop" ]; then
+    nohup "$HOME/bin/spider-web-desktop" &>/dev/null &
+fi
+
+# Launch TUI for chat
+hub tui

@@ -1,0 +1,11 @@
+{
+  "timestamp": 1776084274.2475245,
+  "vram_budget_gb": 8.0,
+  "upgrades": {},
+  "roles_scanned": [
+    "chat",
+    "code",
+    "reasoning",
+    "embed"
+  ]
+}

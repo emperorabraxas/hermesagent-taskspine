@@ -1,0 +1,88 @@
+{
+  "name": "Parallel Research",
+  "description": "Scholar + Oracle + Automator research in parallel \u2192 Oracle synthesizes",
+  "nodes": [
+    {
+      "id": "scholar_research",
+      "type": "agent",
+      "agent": "scholar",
+      "prompt_template": "Research this topic using available tools:\n\n{user_message}",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Scholar: Research",
+      "metadata": {}
+    },
+    {
+      "id": "oracle_analysis",
+      "type": "agent",
+      "agent": "oracle",
+      "prompt_template": "Analyze this topic from a strategic perspective:\n\n{user_message}",
+      "condition": "",
+      "tools": [],
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Oracle: Analyze",
+      "metadata": {}
+    },
+    {
+      "id": "automator_check",
+      "type": "agent",
+      "agent": "automator",
+      "prompt_template": "Check system state and gather technical context for:\n\n{user_message}",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Automator: System Check",
+      "metadata": {}
+    },
+    {
+      "id": "merge",
+      "type": "merge",
+      "agent": "",
+      "prompt_template": "",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Merge All Perspectives",
+      "metadata": {}
+    },
+    {
+      "id": "synthesize",
+      "type": "agent",
+      "agent": "oracle",
+      "prompt_template": "Synthesize these three perspectives into a unified conclusion:\n\n{node_merge_output}\n\nOriginal question: {user_message}",
+      "condition": "",
+      "tools": [],
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Oracle: Synthesize",
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "scholar_research",
+      "target": "merge",
+      "condition_value": ""
+    },
+    {
+      "source": "oracle_analysis",
+      "target": "merge",
+      "condition_value": ""
+    },
+    {
+      "source": "automator_check",
+      "target": "merge",
+      "condition_value": ""
+    },
+    {
+      "source": "merge",
+      "target": "synthesize",
+      "condition_value": ""
+    }
+  ]
+}

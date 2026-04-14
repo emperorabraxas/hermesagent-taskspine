@@ -1,0 +1,25 @@
+FROM huihui_ai/qwen3.5-abliterated:9b
+
+# Speed-tuned qwen3.5 — THINKING DISABLED via /no_think in template
+# Every user message gets /no_think appended automatically
+# Context raised to 16K (fits in 8GB VRAM: ~5.5GB weights + ~1GB KV cache + headroom)
+# Output raised to 4K for longer code/research responses
+
+PARAMETER num_ctx 16384
+PARAMETER num_predict 4096
+PARAMETER temperature 0.6
+PARAMETER top_k 15
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.1
+PARAMETER num_gpu 99
+
+SYSTEM """You are a fast, direct AI assistant. Respond immediately. Be concise. /no_think"""
+
+TEMPLATE """{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{- range .Messages }}{{- if eq .Role "user" }}<|im_start|>user
+{{ .Content }} /no_think<|im_end|>
+{{ else if eq .Role "assistant" }}<|im_start|>assistant
+{{ .Content }}<|im_end|>
+{{ end }}{{- end }}<|im_start|>assistant
+"""

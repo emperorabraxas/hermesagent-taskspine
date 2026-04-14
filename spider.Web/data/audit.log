@@ -1,0 +1,31 @@
+2026-04-11T20:34:56 | rc: | ls -la ~/spider.Web
+2026-04-11T20:36:02 | rc: | ls -la ~/spider.Web
+2026-04-11T20:36:23 | rc:0 | ls -la ~/spider.Web/src
+2026-04-11T20:36:23 | rc: | ls -la ~/spider.Web/scripts
+2026-04-11T20:37:41 | rc: | ls -la ~/spider.Web
+2026-04-11T20:40:19 | rc:0 | ls -la ~/spider.Web
+2026-04-11T20:40:39 | rc:0 | ls -la ~/spider.Web/src
+2026-04-11T20:48:51 | rc: | ls -la /home/bobbyblowssmoke/spider.Web
+2026-04-11T20:49:02 | rc: | ls -la /home/bobbyblowssmoke/spider.Web
+2026-04-11T20:49:02 | rc: | ls -la /home/bobbyblowssmoke/project
+2026-04-11T20:49:14 | rc: | ls -la /home/bobbyblowssmoke/spider.Web/src
+2026-04-11T20:49:14 | rc:0 | ls -la /home/bobbyblowssmoke/project
+2026-04-11T20:49:14 | rc: | ls -la /home/bobbyblowssmoke/uwm-integration/src
+2026-04-11T20:49:24 | rc:ls: cannot access '/home/bobbyblowssmoke/agentic-hub/src/agentic_hub/static': No such file or directory
+ | ls -la ~/agentic-hub/src/agentic_hub/static
+2026-04-11T20:49:24 | rc:0 | ls -la ~/uwm-integration/src/functions/loan-import
+2026-04-11T20:49:24 | rc:0 | ls -la ~/project/src
+2026-04-12T13:53:31 | rc: | ls -la ~/spider.Web
+2026-04-13T08:38:24 | rc: | ls -la ~/spider.Web
+2026-04-13T08:38:24 | rc: | ls -la ~/project
+2026-04-13T08:38:24 | rc: | ls -la ~/uwm-integration
+2026-04-13T08:38:24 | rc: | ls -la ~
+2026-04-13T08:39:52 | rc:0 | ls -la /
+2026-04-13T08:42:24 | rc:bash: line 21: pamac: command not found
+ | pamac install codex
+2026-04-13T08:52:30 | rc: | cd ~
+2026-04-13T08:52:53 | rc:0 | pwd && ls -la ~/spider.Web/ 2>/dev/null || echo "Project not found"
+2026-04-13T08:59:19 | rc:0 | ls -laR ~/bobbyblowssmoke/spider.Web/skills 2>&1 || echo "Skills dir missing"
+2026-04-13T08:59:43 | rc: | ls -laR ~/spider.Web/ 2>/dev/null | head -100
+2026-04-13T09:11:40 | rc: | bash --version
+2026-04-13T09:27:13 | rc:0 | ls -la .

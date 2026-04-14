@@ -1,0 +1,34 @@
+{
+  "productName": "Spider Web",
+  "version": "2.5.0",
+  "identifier": "com.spiderweb.app",
+  "build": {
+    "frontendDist": "./dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "spider.Web // スパイダーウェブ",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "url": "http://localhost:8420"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8420 https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' http://localhost:8420 data:; connect-src 'self' http://localhost:8420 ws://localhost:8420 https://fonts.googleapis.com https://fonts.gstatic.com"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ]
+  }
+}

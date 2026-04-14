@@ -1,0 +1,23 @@
+# ExecuteEvmEoaSwapResult
+Source: https://docs.cdp.coinbase.com/sdks/cdp-sdks-v2/frontend/@coinbase/cdp-core/Interfaces/ExecuteEvmEoaSwapResult
+
+
+
+Result of a successful swap execution for an EOA account.
+
+## Properties
+
+| Property                | Type                                                                                            | Description                                                                                                                                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a /> `account`         | `` `0x${string}` ``                                                                             | The taker address.                                                                                                                                                                                                         |
+| <a /> `network`         | [`EvmSwapsNetwork`](/sdks/cdp-sdks-v2/frontend/@coinbase/cdp-core/Type-Aliases/EvmSwapsNetwork) | The network.                                                                                                                                                                                                               |
+| <a /> `fromToken`       | `string`                                                                                        | The fromToken address.                                                                                                                                                                                                     |
+| <a /> `toToken`         | `string`                                                                                        | The toToken address.                                                                                                                                                                                                       |
+| <a /> `fromAmount`      | `string`                                                                                        | Amount of fromToken sold, in atomic units.                                                                                                                                                                                 |
+| <a /> `toAmount`        | `string`                                                                                        | Expected output from the quote, in atomic units.                                                                                                                                                                           |
+| <a /> `minToAmount`     | `string`                                                                                        | Minimum guaranteed output, in atomic units.                                                                                                                                                                                |
+| <a /> `fees`            | \| `null` \| [`SwapFees`](/sdks/cdp-sdks-v2/frontend/@coinbase/cdp-core/Type-Aliases/SwapFees)  | Fees as quoted at execute time, or null.                                                                                                                                                                                   |
+| <a /> `totalNetworkFee` | `null` \| `string`                                                                              | The estimated total network cost of the swap. On chains where there is no L1 data cost, it is calculated as gas \* gasPrice. On chains where there is an L1 data cost, it is calculated as gas \* gasPrice + L1 data cost. |
+| <a /> `type`            | `"evm-eoa"`                                                                                     | Always "evm-eoa".                                                                                                                                                                                                          |
+| <a /> `transactionHash` | `` `0x${string}` ``                                                                             | The submitted transaction hash.                                                                                                                                                                                            |
+

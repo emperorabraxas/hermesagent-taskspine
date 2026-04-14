@@ -1,0 +1,19 @@
+# CustomAuth
+Source: https://docs.cdp.coinbase.com/sdks/cdp-sdks-v2/frontend/@coinbase/cdp-core/Type-Aliases/CustomAuth
+
+
+
+```ts theme={null}
+type CustomAuth = {
+  getJwt: () => Promise<string | undefined>;
+};
+```
+
+Configuration for custom authentication with third-party identity providers.
+
+## Properties
+
+| Property       | Type                                      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a /> `getJwt` | () => `Promise`\<`string` \| `undefined`> | Callback to retrieve a fresh JWT from your identity provider. Called automatically whenever CDP needs to authenticate requests. **Examples** `lines // With Auth0 (React) const { getAccessTokenSilently } = useAuth0(); customAuth: { getJwt: getAccessTokenSilently }` `lines // With Auth0 (React Native) const { getCredentials } = useAuth0(); customAuth: { getJwt: async () => { const creds = await getCredentials(); return creds?.accessToken; } }` |
+

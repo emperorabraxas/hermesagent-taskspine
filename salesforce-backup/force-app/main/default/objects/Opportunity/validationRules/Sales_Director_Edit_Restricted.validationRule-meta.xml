@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Sales_Director_Edit_Restricted</fullName>
+    <active>true</active>
+    <description>Only Milad can directly set Sales Director. Other users get this value from the LO's User.Manager.</description>
+    <errorConditionFormula>AND(
+  NOT(BEGINS($User.Username, &quot;mromaya@axenmortgage.com&quot;)),
+  NOT(ISBLANK(Sales_Director__c)),
+  OR(
+    ISBLANK(LO__c),
+    Sales_Director__c &lt;&gt; LO__r.ManagerId
+  )
+)</errorConditionFormula>
+    <errorDisplayField>Sales_Director__c</errorDisplayField>
+    <errorMessage>Only Milad can directly edit Sales Director. For everyone else, it is automatically set from the LO's Manager.</errorMessage>
+</ValidationRule>

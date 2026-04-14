@@ -1,0 +1,71 @@
+{
+  "name": "market_analysis",
+  "description": "Money Maker analyzes \u2192 Scholar fact-checks \u2192 conditional trade or hold",
+  "nodes": [
+    {
+      "id": "wolf",
+      "type": "agent",
+      "agent": "money_maker",
+      "prompt_template": "Analyze this market opportunity: {input}. Price targets, risk/reward, recommendation.",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Market Analysis",
+      "metadata": {}
+    },
+    {
+      "id": "scholar",
+      "type": "agent",
+      "agent": "scholar",
+      "prompt_template": "Fact-check this analysis. Verify data points:\n{wolf}",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Fact Check",
+      "metadata": {}
+    },
+    {
+      "id": "gate",
+      "type": "condition",
+      "agent": "",
+      "prompt_template": "",
+      "condition": "confidence > 70",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Strong Signal?",
+      "metadata": {}
+    },
+    {
+      "id": "trade",
+      "type": "agent",
+      "agent": "money_maker",
+      "prompt_template": "Prepare a trade plan:\nAnalysis: {wolf}\nValidation: {scholar}",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Trade Plan",
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "wolf",
+      "target": "scholar",
+      "condition_value": ""
+    },
+    {
+      "source": "scholar",
+      "target": "gate",
+      "condition_value": ""
+    },
+    {
+      "source": "gate",
+      "target": "trade",
+      "condition_value": "true"
+    }
+  ]
+}

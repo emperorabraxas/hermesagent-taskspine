@@ -1,0 +1,54 @@
+{
+  "name": "hitl_deploy",
+  "description": "Code Team builds \u2192 Human approves \u2192 Automator deploys",
+  "nodes": [
+    {
+      "id": "build",
+      "type": "agent",
+      "agent": "code_team",
+      "prompt_template": "Build and test: {input}. Show diff and test results.",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Build",
+      "metadata": {}
+    },
+    {
+      "id": "approve",
+      "type": "hitl",
+      "agent": "",
+      "prompt_template": "Review changes above. Type APPROVE to deploy or REJECT to cancel.",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Human Review",
+      "metadata": {}
+    },
+    {
+      "id": "deploy",
+      "type": "agent",
+      "agent": "automator",
+      "prompt_template": "Deploy the approved changes. Git commit, push, verify.",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Deploy",
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "build",
+      "target": "approve",
+      "condition_value": ""
+    },
+    {
+      "source": "approve",
+      "target": "deploy",
+      "condition_value": ""
+    }
+  ]
+}

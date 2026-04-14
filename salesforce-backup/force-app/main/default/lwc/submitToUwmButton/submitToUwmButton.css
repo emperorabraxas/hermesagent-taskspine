@@ -1,0 +1,12 @@
+.submit-wrapper {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.25rem 1rem;
+}
+
+:host {
+    --slds-c-button-brand-color-background: #03c78d;
+    --slds-c-button-brand-color-background-hover: #039670;
+    --slds-c-button-brand-color-border: #03c78d;
+    --slds-c-button-brand-color-border-hover: #039670;
+}

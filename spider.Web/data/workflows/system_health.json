@@ -1,0 +1,54 @@
+{
+  "name": "system_health",
+  "description": "Automator audits \u2192 Scholar prioritizes \u2192 fix highest priority issue",
+  "nodes": [
+    {
+      "id": "audit",
+      "type": "agent",
+      "agent": "automator",
+      "prompt_template": "Run full system health check: disk, memory, services, docker, git status, failed units, swap usage. Report everything.",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "System Audit",
+      "metadata": {}
+    },
+    {
+      "id": "analyze",
+      "type": "agent",
+      "agent": "scholar",
+      "prompt_template": "Prioritize these system issues by severity. List the top 3 fixes needed:\n{audit}",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Prioritize Issues",
+      "metadata": {}
+    },
+    {
+      "id": "fix",
+      "type": "agent",
+      "agent": "automator",
+      "prompt_template": "Fix the #1 highest priority issue identified here:\n{analyze}",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Auto-Fix",
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "audit",
+      "target": "analyze",
+      "condition_value": ""
+    },
+    {
+      "source": "analyze",
+      "target": "fix",
+      "condition_value": ""
+    }
+  ]
+}

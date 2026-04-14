@@ -1,0 +1,76 @@
+{
+  "name": "code_review",
+  "description": "Code Team writes \u2192 Scholar reviews for bugs \u2192 Automator tests \u2192 merge results",
+  "nodes": [
+    {
+      "id": "coder",
+      "type": "agent",
+      "agent": "code_team",
+      "prompt_template": "Write code for: {input}. Include tests.",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Write Code",
+      "metadata": {}
+    },
+    {
+      "id": "reviewer",
+      "type": "agent",
+      "agent": "scholar",
+      "prompt_template": "Review this code for bugs, security, and edge cases:\n{coder}",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Code Review",
+      "metadata": {}
+    },
+    {
+      "id": "tester",
+      "type": "agent",
+      "agent": "automator",
+      "prompt_template": "Run the tests and report results for:\n{coder}",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Run Tests",
+      "metadata": {}
+    },
+    {
+      "id": "merge",
+      "type": "merge",
+      "agent": "",
+      "prompt_template": "",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Combine Review + Tests",
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "coder",
+      "target": "reviewer",
+      "condition_value": ""
+    },
+    {
+      "source": "coder",
+      "target": "tester",
+      "condition_value": ""
+    },
+    {
+      "source": "reviewer",
+      "target": "merge",
+      "condition_value": ""
+    },
+    {
+      "source": "tester",
+      "target": "merge",
+      "condition_value": ""
+    }
+  ]
+}

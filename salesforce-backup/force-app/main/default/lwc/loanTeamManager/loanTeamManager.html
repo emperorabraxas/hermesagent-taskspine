@@ -1,0 +1,41 @@
+<template>
+  <lightning-card title="Loan Team" icon-name="standard:team_member">
+    <div class="team-grid">
+      <template if:true={hasTeam}>
+        <template for:each={enrichedTeam} for:item="member">
+          <div key={member.key} class="team-cell">
+            <span class="team-role">{member.role}</span>
+
+            <template if:false={member.isEditingThis}>
+              <span class={member.nameClass}>{member.userName}</span>
+              <a href="#" class="change-link" data-role={member.key} onclick={handleEdit}>Change</a>
+            </template>
+
+            <template if:true={member.isEditingThis}>
+              <div class="picker-row">
+                <lightning-record-edit-form
+                  record-id={recordId}
+                  object-api-name={objectApiName}
+                  onsuccess={handleSaveSuccess}
+                  onerror={handleSaveError}
+                  density="compact">
+                  <lightning-input-field
+                    field-name={member.fieldApiName}
+                    variant="label-hidden"
+                    required={member.isRequired}
+                    data-role={member.key}
+                    onchange={handleFieldChange}>
+                  </lightning-input-field>
+                </lightning-record-edit-form>
+              </div>
+            </template>
+          </div>
+        </template>
+      </template>
+
+      <template if:false={hasTeam}>
+        <div class="slds-text-color_weak slds-text-align_center slds-p-around_small">Loading team...</div>
+      </template>
+    </div>
+  </lightning-card>
+</template>

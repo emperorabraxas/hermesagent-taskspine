@@ -1,0 +1,3 @@
+# OnchainKit Configuration
+NEXT_PUBLIC_ONCHAINKIT_API_KEY=your_onchainkit_api_key_here
+NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME=x402 Mini App

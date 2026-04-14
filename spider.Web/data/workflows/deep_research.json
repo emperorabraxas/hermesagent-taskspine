@@ -1,0 +1,71 @@
+{
+  "name": "deep_research",
+  "description": "Scholar + Automator research in parallel \u2192 Oracle synthesizes with real data",
+  "nodes": [
+    {
+      "id": "scholar",
+      "type": "agent",
+      "agent": "scholar",
+      "prompt_template": "Research this topic thoroughly: {input}. Find key facts, evidence, and expert opinions.",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Scholar Research",
+      "metadata": {}
+    },
+    {
+      "id": "automator",
+      "type": "agent",
+      "agent": "automator",
+      "prompt_template": "Fetch real-time data related to: {input}. Use curl, APIs, or system commands to get current facts.",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Data Fetch",
+      "metadata": {}
+    },
+    {
+      "id": "merge",
+      "type": "merge",
+      "agent": "",
+      "prompt_template": "",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Combine Research + Data",
+      "metadata": {}
+    },
+    {
+      "id": "oracle",
+      "type": "agent",
+      "agent": "oracle",
+      "prompt_template": "Synthesize into a clear answer:\n\nResearch: {scholar}\nLive Data: {automator}",
+      "condition": "",
+      "tools": null,
+      "max_tool_rounds": 3,
+      "max_iterations": 5,
+      "label": "Synthesize",
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "scholar",
+      "target": "merge",
+      "condition_value": ""
+    },
+    {
+      "source": "automator",
+      "target": "merge",
+      "condition_value": ""
+    },
+    {
+      "source": "merge",
+      "target": "oracle",
+      "condition_value": ""
+    }
+  ]
+}

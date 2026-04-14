@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spider Web // スパイダーウェブ</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+    --bg:#080808;--bg2:#0e0e0e;--card:#111;--card-hover:#161616;
+    --red:#c41e3a;--red-dim:rgba(196,30,58,0.12);--red-glow:rgba(196,30,58,0.25);
+    --purple:#7b2d8b;--purple-dim:rgba(123,45,139,0.12);
+    --bone:#e8e0d4;--white:#f0f0f0;--dim:#555;--dim2:#333;
+    --green:#22c55e;--teal:#2dd4bf;--amber:#f59e0b;
+    --border:rgba(196,30,58,0.1);--border2:rgba(255,255,255,0.04);
+}
+body{background:var(--bg);color:var(--bone);font-family:'JetBrains Mono',monospace;min-height:100vh;overflow:hidden}
+::selection{background:var(--red);color:#fff}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--red-dim);border-radius:2px}
+
+/* === NAV === */
+nav{
+    height:44px;display:flex;align-items:center;padding:0 1rem;
+    background:var(--bg);border-bottom:1px solid var(--border);
+    position:relative;z-index:100;
+}
+nav::after{content:'';position:absolute;bottom:-1px;left:0;width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--red),transparent)}
+.n-brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1rem;color:var(--red);cursor:pointer}
+.n-jp{font-family:'Noto Sans JP';font-size:0.5rem;color:var(--dim);margin-left:0.4rem;margin-right:auto}
+.n-tabs{display:flex;gap:0}
+.n-tab{
+    padding:0.5rem 1rem;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;
+    color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;
+    font-family:'Space Grotesk',sans-serif;
+}
+.n-tab:hover{color:var(--bone)}.n-tab.active{color:var(--red);border-bottom-color:var(--red)}
+.n-stats{margin-left:auto;display:flex;align-items:center;gap:1rem;font-size:0.7rem}
+.n-stats .lv{color:var(--red);font-weight:700;font-family:'Space Grotesk',sans-serif;font-size:0.85rem}
+.n-stats .xp-wrap{display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+.n-stats .xp-text{font-size:0.6rem;color:var(--bone);font-weight:600}
+.n-stats .xp-bar{width:100px;height:5px;background:var(--dim2);border-radius:2px;overflow:hidden}
+.n-stats .xp-fill{height:100%;background:linear-gradient(90deg,var(--red),var(--purple));border-radius:2px;transition:width 0.8s;box-shadow:0 0 6px var(--red-glow)}
+.n-stats .streak{color:var(--amber);font-size:0.75rem;font-weight:600}
+
+/* === LAYOUT === */
+.view{display:none;height:calc(100vh - 44px)}.view.active{display:flex;flex-direction:column}
+#v-settings.active{display:block}
+
+/* === BRIDGE (Ship + Chat) === */
+#v-bridge.active{display:flex;flex-direction:column;margin-right:260px}
+.ship-panel{
+    height:300px;flex-shrink:0;position:relative;overflow:hidden;
+    background:radial-gradient(ellipse at 50% 50%,#0c0c0c,#040404);
+    border-bottom:1px solid var(--border);
+}
+.ship-panel .stars{position:absolute;inset:0}
+.star{position:absolute;width:1.5px;height:1.5px;background:rgba(255,255,255,0.4);border-radius:50%;animation:tw 4s ease-in-out infinite alternate}
+@keyframes tw{0%{opacity:0.1}100%{opacity:0.6}}
+
+/* Ship hull */
+.hull{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.78);width:720px;height:320px}
+.hull-bg{position:absolute;inset:0;background:transparent}
+/* SVG silk strands */
+.corr-svg{position:absolute;inset:0;pointer-events:none;z-index:1}
+.corr-glow{stroke:rgba(196,30,58,0.08);stroke-width:8;stroke-linecap:round;fill:none}
+.corr-main{stroke:rgba(196,30,58,0.5);stroke-width:1.5;fill:none}
+.corr-wall{stroke:rgba(196,30,58,0.15);stroke-width:0.5;fill:none}
+.web-ring{fill:none;stroke:rgba(196,30,58,0.18);stroke-width:0.8}
+.web-radial{stroke:rgba(196,30,58,0.12);stroke-width:0.5;fill:none}
+
+/* Ship rooms */
+.s-room{
+    position:absolute;border:2px solid rgba(196,30,58,0.2);
+    background:rgba(15,15,18,0.85);z-index:2;transition:all 0.3s;overflow:hidden;
+}
+.s-room:hover{border-color:rgba(196,30,58,0.4)}
+.s-room.active{border-color:rgba(34,197,94,0.5);box-shadow:0 0 20px rgba(34,197,94,0.05)}
+/* Floor tiles per room */
+.s-room .floor{position:absolute;inset:0;opacity:0.12;pointer-events:none;
+    background-size:16px 16px;
+    background-image:linear-gradient(rgba(255,255,255,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.05) 1px,transparent 1px)}
+.s-room.fl-teal .floor{background-color:rgba(45,212,191,0.15)}
+.s-room.fl-purple .floor{background-color:rgba(123,45,139,0.15)}
+.s-room.fl-amber .floor{background-color:rgba(245,158,11,0.15)}
+.s-room.fl-red .floor{background-color:rgba(196,30,58,0.15)}
+.s-room.fl-green .floor{background-color:rgba(34,197,94,0.12)}
+/* Furniture items */
+.furn{position:absolute;font-size:0.65rem;opacity:0.5;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5))}
+.furn.big{font-size:0.85rem}
+.furn.sm{font-size:0.5rem;opacity:0.35}
+.s-room .r-name{position:absolute;top:5px;left:7px;font-size:0.5rem;font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
+.s-room .r-jp{position:absolute;top:4px;right:6px;font-family:'Noto Sans JP';font-size:0.5rem;color:var(--dim2)}
+.s-room .r-model{position:absolute;bottom:4px;left:7px;font-size:0.45rem;color:var(--dim)}
+.s-room .r-pips{position:absolute;bottom:5px;right:6px;display:flex;gap:2px}
+.pip{width:5px;height:8px;border:1px solid var(--dim2);border-radius:1px}
+.pip.on{background:var(--green);border-color:var(--green);box-shadow:0 0 3px var(--green)}
+
+/* Edit mode */
+.s-room.draggable{cursor:grab}.s-room.dragging{opacity:0.7;z-index:50;box-shadow:0 0 30px var(--red-glow)}
+.edit-on .s-room{border-style:dashed}
+.edit-grid{position:absolute;inset:0;display:none;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(196,30,58,0.03) 0px,transparent 1px,transparent 20px),repeating-linear-gradient(0deg,rgba(196,30,58,0.03) 0px,transparent 1px,transparent 20px)}
+.edit-on .edit-grid{display:block}
+.ship-bar{position:absolute;top:6px;left:6px;z-index:60;display:flex;gap:0.4rem}
+.s-btn{background:rgba(0,0,0,0.7);border:1px solid var(--border);color:var(--dim);padding:0.25rem 0.6rem;font-size:0.55rem;cursor:pointer;font-family:'Space Grotesk';text-transform:uppercase;letter-spacing:1px;transition:all 0.2s}
+.s-btn:hover{color:var(--red);border-color:var(--red)}.s-btn.on{color:var(--red);border-color:var(--red);background:var(--red-dim)}
+
+/* === HUD PANEL (gamification + systems) === */
+.hud{position:fixed;top:44px;right:0;width:260px;height:calc(100vh - 44px);background:rgba(6,6,8,0.95);border-left:1px solid var(--border);padding:1rem;z-index:10;backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:0.7rem;overflow-y:auto}
+.hud::before{content:'';position:absolute;top:0;left:10px;right:10px;height:1px;background:linear-gradient(90deg,transparent,var(--red),transparent)}
+/* Level hero */
+.hud-level{text-align:center;padding:0.2rem 0}
+.hud-level .h-rank{font-family:'Noto Sans JP','Space Grotesk';font-size:0.6rem;letter-spacing:2px;color:var(--purple);text-transform:uppercase}
+.hud-level .h-lv{font-family:'Space Grotesk';font-size:4.5rem;font-weight:700;color:var(--red);line-height:1;text-shadow:0 0 50px rgba(196,30,58,0.4)}
+.hud-level .h-lbl{font-size:0.5rem;color:var(--dim);text-transform:uppercase;letter-spacing:3px}
+/* XP bar */
+.hud-xp{display:flex;flex-direction:column;gap:2px}
+.hud-xp .hx-text{display:flex;justify-content:space-between;font-size:0.55rem;color:var(--dim)}
+.hud-xp .hx-text b{color:var(--bone);font-size:0.65rem}
+.hud-xp .hx-bar{height:10px;background:var(--dim2);border-radius:3px;overflow:hidden;border:1px solid rgba(196,30,58,0.1)}
+.hud-xp .hx-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--red),var(--purple));transition:width 1s cubic-bezier(0.4,0,0.2,1);box-shadow:0 0 10px var(--red-glow)}
+/* Stats row */
+.hud-stats{display:flex;justify-content:space-between;gap:0.3rem;padding:0.3rem 0}
+.hud-stat{text-align:center;flex:1;padding:0.4rem 0;background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:3px}
+.hud-stat .hs-val{font-family:'Space Grotesk';font-size:1.2rem;font-weight:700}
+.hud-stat .hs-lbl{font-size:0.4rem;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-top:0.1rem}
+.hs-val.fire{color:var(--amber)}.hs-val.loc{color:var(--teal)}.hs-val.msg{color:var(--bone)}
+/* Systems */
+.hud-sys{border-top:1px solid var(--border);padding-top:0.5rem}
+.hud-sys .hs-title{font-family:'Space Grotesk';font-size:0.5rem;text-transform:uppercase;letter-spacing:2px;color:var(--red);margin-bottom:0.35rem}
+.sp-row{display:flex;align-items:center;gap:0.4rem;padding:0.15rem 0;font-size:0.55rem}
+.sp-row span{flex:1;color:var(--dim)}
+.sp-bar{flex:2;height:6px;background:var(--dim2);border-radius:2px;overflow:hidden}
+.sp-fill{height:100%;border-radius:1px;transition:width 0.5s}
+.sp-fill.red{background:var(--red)}.sp-fill.grn{background:var(--green)}.sp-fill.teal{background:var(--teal)}.sp-fill.amb{background:var(--amber)}
+/* Achievement popup */
+.hud-ach{border-top:1px solid var(--border);padding-top:0.3rem;display:flex;flex-wrap:wrap;gap:0.25rem}
+/* Conversations list */
+.hud-convos{border-top:1px solid var(--border);padding-top:0.5rem;margin-top:0.3rem;flex:1;min-height:0;display:flex;flex-direction:column}
+.hud-convos .hc-title{font-family:'Space Grotesk';font-size:0.5rem;text-transform:uppercase;letter-spacing:2px;color:var(--red);margin-bottom:0.4rem;display:flex;justify-content:space-between;align-items:center}
+.hud-convos .hc-new{background:none;border:1px solid var(--border2);color:var(--dim);padding:0.1rem 0.4rem;border-radius:2px;font-size:0.5rem;cursor:pointer;font-family:'Space Grotesk';letter-spacing:1px}
+.hud-convos .hc-new:hover{color:var(--red);border-color:var(--red)}
+.hud-convos .hc-list{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:0.2rem}
+.conv-item{padding:0.35rem 0.5rem;border-radius:3px;cursor:pointer;font-size:0.6rem;color:var(--dim);border:1px solid transparent;transition:all 0.2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-item:hover{background:rgba(196,30,58,0.05);border-color:var(--border);color:var(--bone)}
+.conv-item.active{background:var(--red-dim);border-color:rgba(196,30,58,0.2);color:var(--bone)}
+.conv-item .ci-time{font-size:0.45rem;color:var(--dim2);margin-left:0.3rem}
+.hud-badge{font-size:0.6rem;padding:0.25rem 0.5rem;background:var(--red-dim);border:1px solid rgba(196,30,58,0.25);border-radius:3px;display:flex;align-items:center;gap:0.25rem;animation:badgePop 0.5s ease}
+@keyframes badgePop{0%{transform:scale(0.5);opacity:0}100%{transform:scale(1);opacity:1}}
+/* XP flash animation on earn */
+.hud-level.flash .h-lv{animation:xpFlash 0.6s ease}
+@keyframes xpFlash{0%{transform:scale(1)}30%{transform:scale(1.2);text-shadow:0 0 40px rgba(196,30,58,0.6)}100%{transform:scale(1)}}
+.ship-name{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:0.5rem;color:var(--dim2);letter-spacing:3px;text-transform:uppercase;font-family:'Space Grotesk'}
+.ship-name b{color:var(--red)}
+
+/* Crew characters */
+.crew{position:absolute;display:flex;flex-direction:column;align-items:center;z-index:5;transition:all 0.3s}
+.crew .bubble{
+    position:absolute;top:-38px;left:50%;transform:translateX(-50%);
+    font-size:0.6rem;background:rgba(8,8,8,0.92);color:var(--bone);
+    padding:0.35rem 0.6rem;border-radius:6px;white-space:nowrap;opacity:0;transition:all 0.3s;
+    border:1px solid rgba(196,30,58,0.25);max-width:220px;overflow:hidden;text-overflow:ellipsis;
+    box-shadow:0 2px 12px rgba(0,0,0,0.5);z-index:20;
+    backdrop-filter:blur(6px);
+}
+/* Bubble opacity controlled by JS updateSpiderBubble */
+/* Spider pixel art body */
+.c-body{position:relative;width:28px;height:24px}
+/* Abdomen (big back circle) */
+.c-body .torso{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:14px;height:12px;border-radius:50%;background:currentColor}
+/* Head (smaller front circle) */
+.c-body .head{position:absolute;top:0;left:50%;transform:translateX(-50%);width:10px;height:9px;border-radius:50%;border:none;background:currentColor}
+/* Eyes (4 spider eyes in 2 rows) */
+.c-body .eyes{position:absolute;top:2px;left:50%;transform:translateX(-50%);display:grid;grid-template-columns:1fr 1fr;gap:1px}
+.c-body .eye{width:2px;height:2px;border-radius:50%;background:#fff}
+/* 8 spider legs — 4 per side */
+.c-body .legs{display:none}
+.c-body .leg{display:none}
+.c-body .arm-l,.c-body .arm-r{display:none}
+.spider-legs{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:28px;height:16px}
+.s-leg{position:absolute;width:8px;height:1.5px;background:currentColor;transform-origin:0% 50%;border-radius:1px}
+/* Left legs */
+.s-leg.l1{top:1px;left:2px;transform:rotate(-30deg)}.s-leg.l2{top:5px;left:0;transform:rotate(-15deg)}
+.s-leg.l3{top:9px;left:0;transform:rotate(10deg)}.s-leg.l4{top:13px;left:2px;transform:rotate(25deg)}
+/* Right legs */
+.s-leg.r1{top:1px;right:2px;transform:rotate(30deg);transform-origin:100% 50%}
+.s-leg.r2{top:5px;right:0;transform:rotate(15deg);transform-origin:100% 50%}
+.s-leg.r3{top:9px;right:0;transform:rotate(-10deg);transform-origin:100% 50%}
+.s-leg.r4{top:13px;right:2px;transform:rotate(-25deg);transform-origin:100% 50%}
+.c-body .badge{position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:0.4rem;z-index:2}
+.c-tag{font-size:0.4rem;color:var(--dim);margin-top:1px;font-family:'Space Grotesk';text-transform:uppercase;letter-spacing:0.5px}
+.c-shadow{width:16px;height:3px;border-radius:50%;background:rgba(0,0,0,0.25);margin-top:-1px}
+
+/* Crew color themes */
+/* Spider colors — uses currentColor for body + legs */
+.cr-opus{color:var(--red)}.cr-scholar{color:var(--teal)}.cr-oracle{color:var(--purple)}.cr-auto{color:var(--amber)}.cr-codex{color:var(--green)}
+
+/* Animations */
+.crew.idle{animation:cIdle 3.5s ease-in-out infinite}
+@keyframes cIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+.crew.working{animation:cWork 0.6s ease-in-out infinite}
+@keyframes cWork{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}
+/* Spider leg animations */
+.crew.working .head{box-shadow:0 0 6px currentColor}
+.crew.working .s-leg{animation:legTwitch 0.4s ease-in-out infinite alternate}
+.crew.working .s-leg.l2,.crew.working .s-leg.r2{animation-delay:0.1s}
+.crew.working .s-leg.l3,.crew.working .s-leg.r3{animation-delay:0.2s}
+.crew.working .s-leg.l4,.crew.working .s-leg.r4{animation-delay:0.3s}
+@keyframes legTwitch{0%{transform:rotate(var(--base-rot,0deg))}100%{transform:rotate(calc(var(--base-rot,0deg) + 8deg))}}
+.crew.walking{animation:none}
+.crew.walking .s-leg{animation:legWalk 0.25s ease-in-out infinite alternate}
+.crew.walking .s-leg.l2,.crew.walking .s-leg.r1{animation-delay:0.06s}
+.crew.walking .s-leg.l3,.crew.walking .s-leg.r2{animation-delay:0.12s}
+.crew.walking .s-leg.l4,.crew.walking .s-leg.r3{animation-delay:0.18s}
+@keyframes legWalk{0%{transform:rotate(var(--base-rot,0deg))}100%{transform:rotate(calc(var(--base-rot,0deg) + 15deg))}}
+.footprint{position:absolute;width:3px;height:3px;border-radius:50%;background:rgba(196,30,58,0.12);pointer-events:none;animation:fpFade 1.5s ease-out forwards}
+@keyframes fpFade{to{opacity:0;transform:scale(0.2)}}
+
+/* === CHAT === */
+.chat-panel{flex:1;display:flex;flex-direction:column;min-height:0;padding:0.75rem 1rem 0.5rem}
+.chat-msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:0.5rem;padding:0.5rem 0}
+.msg{max-width:80%;padding:0.65rem 0.85rem;font-size:0.78rem;line-height:1.6;animation:fadeIn 0.3s ease;border-left:2px solid transparent}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.msg.user{align-self:flex-end;background:rgba(196,30,58,0.05);border:1px solid var(--red-dim);border-right:2px solid var(--red);border-left:none;border-radius:4px 2px 2px 4px}
+.msg.assistant{align-self:flex-start;background:rgba(255,255,255,0.01);border:1px solid var(--border2);border-left:2px solid var(--dim2);border-radius:2px 4px 4px 2px}
+.msg .tag{font-size:0.5rem;text-transform:uppercase;letter-spacing:2px;margin-bottom:0.25rem;font-weight:700;font-family:'Space Grotesk'}
+.tag.scholar{color:var(--teal)}.tag.oracle{color:var(--purple)}.tag.automator{color:var(--amber)}.tag.code_team{color:var(--red)}.tag.opus{color:var(--red)}.tag.system{color:var(--dim)}
+.msg pre{background:rgba(0,0,0,0.4);padding:0.5rem 0.7rem;border-radius:2px;overflow-x:auto;margin:0.4rem 0;font-size:0.72rem;border-left:2px solid var(--red)}
+.msg code:not(pre code){background:rgba(196,30,58,0.06);padding:0.1em 0.3em;border-radius:2px;font-size:0.8em;color:var(--red)}
+.msg strong{color:var(--white)}.msg h2,.msg h3,.msg h4{color:var(--red);font-family:'Space Grotesk';margin:0.5em 0 0.2em}.msg h2{font-size:0.95rem}.msg h3{font-size:0.85rem}.msg h4{font-size:0.8rem}
+/* Typing dots */
+.typing-dots{color:var(--dim);font-size:1.2rem;letter-spacing:3px}
+.typing-dots span{animation:dotBlink 1.4s infinite;opacity:0.2}
+.typing-dots span:nth-child(2){animation-delay:0.2s}
+.typing-dots span:nth-child(3){animation-delay:0.4s}
+@keyframes dotBlink{0%,100%{opacity:0.2}50%{opacity:1}}
+.xp-toast{font-size:0.6rem;margin-top:0.35rem;padding:0.2rem 0.5rem;display:inline-block;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);color:var(--green);border-radius:2px}
+.ach-toast{font-size:0.6rem;margin-top:0.2rem;padding:0.2rem 0.5rem;display:inline-block;background:rgba(196,30,58,0.06);border:1px solid var(--red-dim);color:var(--red);border-radius:2px;animation:achGlow 1.5s ease 3}
+@keyframes achGlow{50%{box-shadow:0 0 12px var(--red-glow)}}
+
+/* Level up celebration */
+.level-up-flash{animation:lvlFlash 0.8s ease}
+@keyframes lvlFlash{0%{filter:brightness(1)}20%{filter:brightness(2.5)}100%{filter:brightness(1)}}
+.screen-shake{animation:shake 0.4s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+
+/* Combo indicator */
+.combo-badge{
+    position:fixed;top:50px;left:50%;transform:translateX(-50%);z-index:200;
+    font-family:'Space Grotesk';font-weight:700;font-size:1.2rem;color:var(--red);
+    background:rgba(8,8,8,0.9);border:1px solid var(--red);padding:0.3rem 1rem;
+    border-radius:4px;opacity:0;transition:all 0.3s;pointer-events:none;
+    box-shadow:0 0 20px var(--red-glow);
+}
+.combo-badge.show{opacity:1;transform:translateX(-50%) scale(1.1)}
+
+/* Room loading pulse */
+.s-room.loading{animation:roomPulse 1.5s ease-in-out infinite}
+@keyframes roomPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 20px rgba(196,30,58,0.2)}}
+
+/* Chat header */
+.chat-header{display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border2)}
+.new-chat-btn{background:none;border:1px solid var(--border2);color:var(--dim);padding:0.2rem 0.6rem;border-radius:3px;font-size:0.55rem;cursor:pointer;font-family:'Space Grotesk';letter-spacing:1px;transition:all 0.2s}
+.new-chat-btn:hover{color:var(--red);border-color:var(--red)}
+/* Copy code button */
+.msg pre{position:relative}
+.copy-btn{position:absolute;top:4px;right:4px;background:rgba(196,30,58,0.15);border:1px solid var(--border);color:var(--dim);padding:0.15rem 0.4rem;border-radius:2px;font-size:0.5rem;cursor:pointer;font-family:'JetBrains Mono';opacity:0;transition:opacity 0.2s}
+.msg pre:hover .copy-btn{opacity:1}
+.copy-btn.copied{color:var(--green);border-color:var(--green)}
+/* Error retry */
+.retry-btn{background:var(--red-dim);border:1px solid var(--red);color:var(--red);padding:0.25rem 0.8rem;border-radius:3px;font-size:0.6rem;cursor:pointer;font-family:'Space Grotesk';margin-top:0.5rem;display:inline-block}
+.retry-btn:hover{background:var(--red);color:#fff}
+.chat-bar{display:flex;gap:0.4rem;padding:0.5rem 0;border-top:1px solid var(--border)}
+.chat-bar input{flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:2px;padding:0.6rem 0.8rem;color:var(--bone);font-family:'JetBrains Mono';font-size:0.78rem;outline:none;transition:border-color 0.2s}
+.chat-bar input:focus{border-color:var(--red)}
+.chat-bar input::placeholder{color:var(--dim2)}
+.chat-bar button{background:var(--red);border:none;color:#fff;padding:0.6rem 1.2rem;border-radius:2px;font-family:'Space Grotesk';font-weight:700;font-size:0.78rem;cursor:pointer;transition:all 0.2s;letter-spacing:1px}
+.chat-bar button:hover{box-shadow:0 0 20px var(--red-glow)}.chat-bar button:disabled{opacity:0.3;cursor:not-allowed}
+
+/* === OTHER PAGES === */
+.page{display:none;padding:1.2rem;max-width:1000px;margin:0 auto;height:calc(100vh - 44px);overflow-y:auto}.page.active{display:block}
+.sec-t{font-family:'Space Grotesk';font-size:1.1rem;font-weight:700;color:var(--red);margin-bottom:0.2rem}
+.sec-s{font-size:0.55rem;color:var(--dim);margin-bottom:1.2rem;letter-spacing:1px;font-family:'Noto Sans JP'}
+
+/* Models table */
+.m-table{width:100%;border-collapse:collapse}.m-table th{text-align:left;padding:0.5rem 0.8rem;font-size:0.5rem;text-transform:uppercase;letter-spacing:2px;color:var(--dim);border-bottom:1px solid var(--border);font-family:'Space Grotesk'}
+.m-table td{padding:0.55rem 0.8rem;font-size:0.72rem;border-bottom:1px solid var(--border2)}
+.m-table tr:hover td{background:var(--red-dim)}
+.m-name{color:var(--teal);font-weight:600}.m-asgn{color:var(--red)}
+.m-btn{background:none;border:1px solid var(--border2);color:var(--dim);padding:0.2rem 0.5rem;border-radius:2px;font-size:0.6rem;cursor:pointer;font-family:'JetBrains Mono';transition:all 0.2s}
+.m-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* Stats page */
+.st-hero{text-align:center;padding:2rem 0 1rem}
+.st-hero .rank{font-family:'Noto Sans JP','Space Grotesk';font-size:0.6rem;letter-spacing:3px;color:var(--purple)}
+.st-hero .lvl{font-family:'Space Grotesk';font-size:5rem;font-weight:700;color:var(--red);text-shadow:0 0 60px rgba(196,30,58,0.15);line-height:1}
+.st-hero .lbl{font-size:0.5rem;color:var(--dim);text-transform:uppercase;letter-spacing:3px;margin-top:0.2rem}
+.st-hero .xp{font-size:1.2rem;color:var(--bone);margin-top:0.4rem}.st-hero .xp b{color:var(--red)}
+.st-bar{max-width:400px;margin:1rem auto}.st-bar-out{height:12px;background:var(--dim2);border-radius:2px;overflow:hidden;border:1px solid var(--border2)}
+.st-bar-in{height:100%;background:linear-gradient(90deg,var(--red),var(--purple));transition:width 1.5s;box-shadow:0 0 10px var(--red-glow)}
+.st-bar-lbl{display:flex;justify-content:space-between;font-size:0.55rem;color:var(--dim);margin-top:0.3rem}
+.st-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.8rem;margin:1.5rem 0}
+.st-card{background:var(--card);border:1px solid var(--border2);padding:1rem;text-align:center}
+.st-card .v{font-size:1.8rem;font-weight:700;font-family:'Space Grotesk'}.st-card .l{font-size:0.5rem;color:var(--dim);text-transform:uppercase;letter-spacing:1.5px;margin-top:0.15rem}
+.st-card.c-red .v{color:var(--red)}.st-card.c-grn .v{color:var(--green)}.st-card.c-amb .v{color:var(--amber)}.st-card.c-pur .v{color:var(--purple)}
+.badge-row{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.8rem}
+.bdg{padding:0.35rem 0.65rem;font-size:0.65rem;border:1px solid var(--border2);background:var(--card);display:flex;align-items:center;gap:0.3rem;transition:all 0.3s}
+.bdg.on{border-color:var(--red-dim);background:var(--red-dim)}.bdg.off{opacity:0.15}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-bg.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);padding:1.5rem;min-width:320px}
+.modal h3{font-family:'Space Grotesk';color:var(--red);margin-bottom:0.8rem;font-size:0.9rem}
+.modal select,.modal input{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;margin-bottom:0.8rem;font-family:'JetBrains Mono';font-size:0.78rem}
+.modal-btns{display:flex;gap:0.5rem;justify-content:flex-end}
+.btn-g{background:none;border:1px solid var(--border2);color:var(--dim);padding:0.4rem 0.8rem;cursor:pointer;font-family:'JetBrains Mono';font-size:0.72rem}
+.btn-p{background:var(--red);border:none;color:#fff;padding:0.4rem 1rem;cursor:pointer;font-family:'Space Grotesk';font-weight:700;font-size:0.72rem}
+
+@media(max-width:768px){.hull{transform:translate(-50%,-50%) scale(0.5)}.st-grid{grid-template-columns:repeat(2,1fr)}.n-stats{display:none}.ship-panel{height:220px}}
+</style>
+</head>
+<body>
+
+<nav>
+    <div class="n-brand" onclick="go('bridge')">🕸 Spider Web</div>
+    <div class="n-jp">スパイダーウェブ</div>
+    <div class="n-tabs">
+        <div class="n-tab active" data-t="bridge" onclick="go('bridge')">Bridge</div>
+        <div class="n-tab" data-t="settings" onclick="go('settings')">Settings</div>
+    </div>
+    <div class="n-stats">
+        <span class="streak" id="n-streak">🔥 0</span>
+        <span class="lv" id="n-lv">Lv 0</span>
+        <div class="xp-wrap">
+            <span class="xp-text" id="n-xp">0 XP</span>
+            <div class="xp-bar"><div class="xp-fill" id="n-xp-bar" style="width:0%"></div></div>
+        </div>
+    </div>
+</nav>
+
+<!-- ===== BRIDGE ===== -->
+<div class="view active" id="v-bridge">
+    <div class="ship-panel">
+        <div class="stars" id="stars"></div>
+        <div class="ship-bar">
+            <button class="s-btn" id="edit-btn" onclick="toggleEdit()">🔧 Edit</button>
+            <button class="s-btn" id="reset-btn" onclick="resetShip()" style="display:none">↺ Reset</button>
+        </div>
+        <div class="hull" id="hull">
+            <div class="hull-bg"></div>
+            <div class="edit-grid"></div>
+            <svg class="corr-svg" id="corr-svg" width="720" height="320"></svg>
+
+            <div class="s-room fl-red" id="room-cockpit"><div class="floor"></div><div class="r-name" style="color:var(--red)">Cockpit</div><div class="r-jp">操縦室</div><div class="r-model">opus · captain</div><div class="r-pips"><div class="pip on"></div><div class="pip on"></div><div class="pip on"></div></div>
+                <div class="furn big" style="top:18px;right:8px">🖥️</div><div class="furn sm" style="bottom:18px;right:12px">📡</div><div class="furn sm" style="top:40px;right:28px">🎛️</div>
+                <div class="crew working cr-opus" style="top:30px;left:40px"><div class="bubble">routing...</div><div class="c-body"><div class="head"></div><div class="eyes"><div class="eye"></div><div class="eye"></div><div class="eye"></div><div class="eye"></div></div><div class="torso"></div><div class="spider-legs"><div class="s-leg l1"></div><div class="s-leg l2"></div><div class="s-leg l3"></div><div class="s-leg l4"></div><div class="s-leg r1"></div><div class="s-leg r2"></div><div class="s-leg r3"></div><div class="s-leg r4"></div></div></div><div class="c-shadow"></div><div class="c-tag">Opus</div></div>
+            </div>
+            <div class="s-room fl-teal" id="room-scholar"><div class="floor"></div><div class="r-name" style="color:var(--teal)">Sensors</div><div class="r-jp">書斎</div><div class="r-model" id="rm-scholar">qwen2.5:7b</div><div class="r-pips" id="rp-scholar"></div>
+                <div class="furn" style="top:18px;right:8px">📚</div><div class="furn" style="bottom:20px;right:10px">📜</div><div class="furn sm" style="top:40px;right:30px">🔬</div><div class="furn big" style="bottom:22px;left:8px">🖥️</div><div class="furn sm" style="top:20px;left:35px">🌿</div>
+                <div class="crew idle cr-scholar" id="crew-scholar" style="top:35px;left:50px"><div class="bubble">📚 researching...</div><div class="c-body"><div class="head"></div><div class="eyes"><div class="eye"></div><div class="eye"></div><div class="eye"></div><div class="eye"></div></div><div class="torso"></div><div class="spider-legs"><div class="s-leg l1"></div><div class="s-leg l2"></div><div class="s-leg l3"></div><div class="s-leg l4"></div><div class="s-leg r1"></div><div class="s-leg r2"></div><div class="s-leg r3"></div><div class="s-leg r4"></div></div></div><div class="c-shadow"></div><div class="c-tag">Scholar</div></div>
+            </div>
+            <div class="s-room fl-purple" id="room-oracle"><div class="floor"></div><div class="r-name" style="color:var(--purple)">Bridge</div><div class="r-jp">茶室</div><div class="r-model" id="rm-oracle">llama3.1:8b</div><div class="r-pips" id="rp-oracle"></div>
+                <div class="furn" style="top:20px;right:10px">🍵</div><div class="furn sm" style="top:38px;right:28px">🕯️</div><div class="furn big" style="bottom:20px;right:8px">💻</div><div class="furn sm" style="bottom:22px;left:10px">🪷</div><div class="furn sm" style="top:18px;left:30px">🌸</div>
+                <div class="crew idle cr-oracle" id="crew-oracle" style="top:35px;left:50px"><div class="bubble">🍵 thinking...</div><div class="c-body"><div class="head"></div><div class="eyes"><div class="eye"></div><div class="eye"></div><div class="eye"></div><div class="eye"></div></div><div class="torso"></div><div class="spider-legs"><div class="s-leg l1"></div><div class="s-leg l2"></div><div class="s-leg l3"></div><div class="s-leg l4"></div><div class="s-leg r1"></div><div class="s-leg r2"></div><div class="s-leg r3"></div><div class="s-leg r4"></div></div></div><div class="c-shadow"></div><div class="c-tag">Oracle</div></div>
+            </div>
+            <div class="s-room fl-red" id="room-ops" style="border-color:rgba(196,30,58,0.25)"><div class="floor"></div><div class="r-name" style="color:var(--red)">Ops Center</div><div class="r-jp">作業室</div><div class="r-model" style="color:var(--dim)">workstation</div><div class="r-pips"><div class="pip on"></div><div class="pip on"></div><div class="pip on"></div><div class="pip on"></div></div>
+                <div class="furn big" style="top:18px;left:10px">🖥️</div><div class="furn big" style="top:18px;right:10px">🖥️</div><div class="furn" style="bottom:20px;left:50%;transform:translateX(-50%)">📊</div><div class="furn sm" style="top:50px;left:50%;transform:translateX(-50%)">☕</div><div class="furn sm" style="bottom:18px;left:10px">🌿</div><div class="furn sm" style="bottom:18px;right:10px">🌿</div></div>
+            <div class="s-room fl-amber" id="room-automator"><div class="floor"></div><div class="r-name" style="color:var(--amber)">Engines</div><div class="r-jp">工房</div><div class="r-model" id="rm-automator">phi3</div><div class="r-pips" id="rp-automator"></div>
+                <div class="furn big" style="top:20px;right:8px">⚙️</div><div class="furn" style="bottom:22px;right:12px">🔧</div><div class="furn sm" style="top:42px;left:10px">🔩</div><div class="furn big" style="bottom:20px;left:8px">💻</div><div class="furn sm" style="top:18px;left:30px">📟</div>
+                <div class="crew idle cr-auto" id="crew-automator" style="top:38px;left:50px"><div class="bubble">⚙️ executing...</div><div class="c-body"><div class="head"></div><div class="eyes"><div class="eye"></div><div class="eye"></div><div class="eye"></div><div class="eye"></div></div><div class="torso"></div><div class="spider-legs"><div class="s-leg l1"></div><div class="s-leg l2"></div><div class="s-leg l3"></div><div class="s-leg l4"></div><div class="s-leg r1"></div><div class="s-leg r2"></div><div class="s-leg r3"></div><div class="s-leg r4"></div></div></div><div class="c-shadow"></div><div class="c-tag">Auto</div></div>
+            </div>
+            <div class="s-room fl-green" id="room-code_team"><div class="floor"></div><div class="r-name" style="color:var(--red)">Weapons</div><div class="r-jp">作戦室</div><div class="r-model">opus + codex</div><div class="r-pips"><div class="pip on"></div><div class="pip on"></div></div>
+                <div class="furn big" style="top:16px;right:8px">🖥️</div><div class="furn big" style="bottom:16px;right:8px">🖥️</div><div class="furn sm" style="top:50%;left:8px;transform:translateY(-50%)">⚡</div><div class="furn sm" style="top:18px;left:30px">📋</div><div class="furn sm" style="bottom:18px;left:30px">📋</div>
+                <div class="crew idle cr-opus" style="top:30px;left:25px"><div class="bubble">🗡️ debating...</div><div class="c-body"><div class="head"></div><div class="eyes"><div class="eye"></div><div class="eye"></div><div class="eye"></div><div class="eye"></div></div><div class="torso"></div><div class="spider-legs"><div class="s-leg l1"></div><div class="s-leg l2"></div><div class="s-leg l3"></div><div class="s-leg l4"></div><div class="s-leg r1"></div><div class="s-leg r2"></div><div class="s-leg r3"></div><div class="s-leg r4"></div></div></div><div class="c-shadow"></div><div class="c-tag">Opus</div></div>
+                <div class="crew idle cr-codex" style="top:70px;left:65px"><div class="bubble">💻 coding...</div><div class="c-body"><div class="head"></div><div class="eyes"><div class="eye"></div><div class="eye"></div><div class="eye"></div><div class="eye"></div></div><div class="torso"></div><div class="spider-legs"><div class="s-leg l1"></div><div class="s-leg l2"></div><div class="s-leg l3"></div><div class="s-leg l4"></div><div class="s-leg r1"></div><div class="s-leg r2"></div><div class="s-leg r3"></div><div class="s-leg r4"></div></div></div><div class="c-shadow"></div><div class="c-tag">Codex</div></div>
+            </div>
+            <!-- LAB — DeepSeek R1 / Fallback Brain -->
+            <div class="s-room fl-red" id="room-lab"><div class="floor"></div><div class="r-name" style="color:#ff6b6b">Lab</div><div class="r-jp">研究所</div><div class="r-model" id="rm-lab">deepseek-r1:7b</div><div class="r-pips" id="rp-lab"></div>
+                <div class="furn sm" style="top:18px;right:8px">🧪</div><div class="furn sm" style="bottom:18px;left:8px">🔬</div><div class="furn sm" style="top:40px;left:30px">📊</div>
+                <div class="crew idle" id="crew-lab" style="top:35px;left:45px;color:#ff6b6b"><div class="bubble">🧠 reasoning...</div><div class="c-body"><div class="head"></div><div class="eyes"><div class="eye"></div><div class="eye"></div><div class="eye"></div><div class="eye"></div></div><div class="torso"></div><div class="spider-legs"><div class="s-leg l1"></div><div class="s-leg l2"></div><div class="s-leg l3"></div><div class="s-leg l4"></div><div class="s-leg r1"></div><div class="s-leg r2"></div><div class="s-leg r3"></div><div class="s-leg r4"></div></div></div><div class="c-shadow"></div><div class="c-tag">R1</div></div>
+            </div>
+        </div>
+        <div class="hud" id="hud">
+            <div class="hud-level" id="hud-level">
+                <div class="h-rank" id="hud-rank">見習い — Apprentice</div>
+                <div class="h-lv" id="hud-lv">0</div>
+                <div class="h-lbl">レベル</div>
+            </div>
+            <div class="hud-xp">
+                <div class="hx-text"><span><b id="hud-xp-cur">0</b> XP</span><span id="hud-xp-next">→ Lv 1: 100</span></div>
+                <div class="hx-bar"><div class="hx-fill" id="hud-xp-bar" style="width:0%"></div></div>
+            </div>
+            <div class="hud-stats">
+                <div class="hud-stat"><div class="hs-val fire" id="hud-streak">0</div><div class="hs-lbl">🔥 Streak</div></div>
+                <div class="hud-stat"><div class="hs-val loc" id="hud-local">—</div><div class="hs-lbl">🔒 Local</div></div>
+                <div class="hud-stat"><div class="hs-val msg" id="hud-msgs">0</div><div class="hs-lbl">💬 Msgs</div></div>
+            </div>
+            <div class="hud-sys">
+                <div class="hs-title">Ship Systems</div>
+                <div class="sp-row"><span>Hull</span><div class="sp-bar"><div class="sp-fill red" id="sys-hull" style="width:0%"></div></div></div>
+                <div class="sp-row"><span>Shields</span><div class="sp-bar"><div class="sp-fill amb" id="sys-shields" style="width:0%"></div></div></div>
+                <div class="sp-row"><span>Fuel</span><div class="sp-bar"><div class="sp-fill teal" id="sys-fuel" style="width:0%"></div></div></div>
+            </div>
+            <div class="hud-ach" id="hud-ach"></div>
+            <div class="hud-convos">
+                <div class="hc-title"><span>Conversations</span><button class="hc-new" onclick="newConvo()">+ New</button></div>
+                <div class="hc-list" id="convo-list"></div>
+            </div>
+        </div>
+        <div class="ship-name">🕸 <b>Spider Web</b> // 蜘蛛の巣</div>
+    </div>
+
+    <div class="chat-panel">
+        <div class="chat-header">
+            <span style="font-size:0.6rem;color:var(--dim);letter-spacing:1px;text-transform:uppercase;font-family:'Space Grotesk'">Chat</span>
+            <button class="new-chat-btn" onclick="newChat()" title="New conversation">+ New</button>
+        </div>
+        <div class="chat-msgs" id="chat-msgs">
+            <div class="msg assistant"><div class="tag system">いらっしゃいませ</div><div class="msg-body">Welcome to <strong>Spider Web</strong>. Type anything — watch the spiders work.</div></div>
+        </div>
+        <div class="chat-bar">
+            <input type="text" id="chat-in" placeholder="何でも聞いて..." autofocus />
+            <button id="send-btn" onclick="send()">SEND</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<!-- Combo badge -->
+<div class="combo-badge" id="combo-badge">🔥 2x COMBO</div>
+
+<!-- Setup modal (first launch) -->
+<div class="modal-bg" id="setup-modal">
+    <div class="modal">
+        <h3>🕸 Spider Web — Setup</h3>
+        <p style="font-size:0.65rem;color:var(--dim);margin-bottom:1rem;line-height:1.5">
+            API keys enable Opus code validation + Codex. Without them, everything runs locally.<br>
+            <span style="color:var(--teal)">Keys are saved locally in .env — never sent anywhere.</span>
+        </p>
+        <label style="font-size:0.5rem;color:var(--dim);letter-spacing:1px">ANTHROPIC API KEY <span style="color:var(--dim)">(for Opus)</span></label>
+        <input id="setup-anthropic" placeholder="sk-ant-..." />
+        <label style="font-size:0.5rem;color:var(--dim);letter-spacing:1px">OPENAI API KEY <span style="color:var(--dim)">(for Codex — optional)</span></label>
+        <input id="setup-openai" placeholder="sk-proj-..." />
+        <div class="modal-btns">
+            <button class="btn-g" onclick="closeSetup()">Skip (local only)</button>
+            <button class="btn-p" onclick="saveSetup()">Save Keys</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== SETTINGS ===== -->
+<div class="view" id="v-settings" style="max-width:700px;margin:0 auto;padding:1.5rem;overflow-y:auto">
+    <div class="sec-t">Settings</div>
+    <div class="sec-s">設定 — Configure Spider Web to your workflow</div>
+
+    <div style="display:flex;flex-direction:column;gap:1.5rem" id="settings-form">
+        <!-- Profile -->
+        <fieldset style="border:1px solid var(--border);padding:1rem;border-radius:4px">
+            <legend style="color:var(--red);font-family:'Space Grotesk';font-size:0.7rem;letter-spacing:1px;padding:0 0.5rem">PROFILE</legend>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">USERNAME</label>
+            <input id="pref-username" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;margin-bottom:0.8rem;font-family:'JetBrains Mono';font-size:0.8rem"/>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">PREFERRED LANGUAGE</label>
+            <select id="pref-language" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;margin-bottom:0.8rem;font-family:'JetBrains Mono';font-size:0.8rem">
+                <option>Python</option><option>JavaScript</option><option>TypeScript</option><option>Rust</option><option>Go</option><option>Java</option><option>C</option><option>C++</option><option>GDScript</option><option>Apex</option><option>Bash</option>
+            </select>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">CURRENT FOCUS <span style="color:var(--dim)">(what are you working on?)</span></label>
+            <input id="pref-focus" placeholder="e.g. Salesforce LWC migration, UWM API integration..." style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;margin-bottom:0.8rem;font-family:'JetBrains Mono';font-size:0.8rem"/>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">PROJECT DIRECTORIES <span style="color:var(--dim)">(comma-separated)</span></label>
+            <input id="pref-dirs" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;font-family:'JetBrains Mono';font-size:0.8rem"/>
+        </fieldset>
+
+        <!-- Response Style -->
+        <fieldset style="border:1px solid var(--border);padding:1rem;border-radius:4px">
+            <legend style="color:var(--red);font-family:'Space Grotesk';font-size:0.7rem;letter-spacing:1px;padding:0 0.5rem">RESPONSE STYLE</legend>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">STYLE</label>
+            <select id="pref-style" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;margin-bottom:0.8rem;font-family:'JetBrains Mono';font-size:0.8rem">
+                <option value="concise">Concise — short, direct answers</option>
+                <option value="verbose">Verbose — detailed explanations</option>
+                <option value="code-only">Code only — no explanation unless asked</option>
+            </select>
+            <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
+                <label style="font-size:0.7rem;color:var(--bone);display:flex;align-items:center;gap:0.4rem">
+                    <input type="checkbox" id="pref-explain" /> Explain code
+                </label>
+                <label style="font-size:0.7rem;color:var(--bone);display:flex;align-items:center;gap:0.4rem">
+                    <input type="checkbox" id="pref-japanese" /> Japanese accents
+                </label>
+            </div>
+        </fieldset>
+
+        <!-- Agent Behavior -->
+        <fieldset style="border:1px solid var(--border);padding:1rem;border-radius:4px">
+            <legend style="color:var(--red);font-family:'Space Grotesk';font-size:0.7rem;letter-spacing:1px;padding:0 0.5rem">AGENT BEHAVIOR</legend>
+            <div style="display:flex;gap:1.5rem;margin-bottom:0.8rem">
+                <label style="font-size:0.7rem;color:var(--bone);display:flex;align-items:center;gap:0.4rem">
+                    <input type="checkbox" id="pref-autoexec" /> Auto-execute commands
+                </label>
+                <label style="font-size:0.7rem;color:var(--bone);display:flex;align-items:center;gap:0.4rem">
+                    <input type="checkbox" id="pref-rag" /> Scholar uses RAG
+                </label>
+                <label style="font-size:0.7rem;color:var(--bone);display:flex;align-items:center;gap:0.4rem">
+                    <input type="checkbox" id="pref-terminal" /> Terminal only (spiders launches TUI)
+                </label>
+            </div>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">OPUS REVIEW LEVEL</label>
+            <select id="pref-review" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;margin-bottom:0.8rem;font-family:'JetBrains Mono';font-size:0.8rem">
+                <option value="light">Light — quick glance, mostly approves</option>
+                <option value="thorough">Thorough — checks edge cases and quality</option>
+                <option value="aggressive">Aggressive — nitpicks everything, forces revisions</option>
+            </select>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">CODE TEAM MAX ROUNDS</label>
+            <select id="pref-rounds" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;font-family:'JetBrains Mono';font-size:0.8rem">
+                <option value="1">1 — Quick (coder + one review)</option>
+                <option value="2">2 — Standard</option>
+                <option value="3">3 — Thorough (up to 3 rounds)</option>
+            </select>
+        </fieldset>
+
+        <!-- Models -->
+        <fieldset style="border:1px solid var(--border);padding:1rem;border-radius:4px">
+            <legend style="color:var(--red);font-family:'Space Grotesk';font-size:0.7rem;letter-spacing:1px;padding:0 0.5rem">MODELS <span style="color:var(--dim)">(blank = use default)</span></legend>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">SCHOLAR MODEL</label>
+            <input id="pref-m-scholar" placeholder="qwen2.5:7b" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;margin-bottom:0.6rem;font-family:'JetBrains Mono';font-size:0.8rem"/>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">AUTOMATOR MODEL</label>
+            <input id="pref-m-automator" placeholder="phi3:latest" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;margin-bottom:0.6rem;font-family:'JetBrains Mono';font-size:0.8rem"/>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">ORACLE MODEL</label>
+            <input id="pref-m-oracle" placeholder="llama3.1:8b" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;margin-bottom:0.6rem;font-family:'JetBrains Mono';font-size:0.8rem"/>
+            <label style="font-size:0.55rem;color:var(--dim);letter-spacing:1px">CODER MODEL</label>
+            <input id="pref-m-coder" placeholder="qwen2.5-coder-7b:latest" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--bone);padding:0.5rem;font-family:'JetBrains Mono';font-size:0.8rem"/>
+        </fieldset>
+
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end">
+            <button class="btn-g" onclick="loadPrefs()">Reset</button>
+            <button class="btn-p" onclick="savePrefs()">Save Settings</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-bg" id="asgn-modal"><div class="modal"><h3>Assign Model</h3><label style="font-size:0.5rem;color:var(--dim);letter-spacing:1px">MODEL</label><input id="asgn-m" readonly/><label style="font-size:0.5rem;color:var(--dim);letter-spacing:1px">AGENT</label><select id="asgn-a"><option value="scholar">Scholar</option><option value="automator">Automator</option><option value="oracle">Oracle</option></select><div class="modal-btns"><button class="btn-g" onclick="closeM()">Cancel</button><button class="btn-p" onclick="doAsgn()">Assign</button></div></div></div>
+
+<script>
+const A='';let sid=null;
+const RANKS=[[0,'見習い — Apprentice'],[5,'糸紡ぎ — Thread Spinner'],[10,'織り手 — Weaver'],[25,'絹職人 — Silk Artisan'],[50,'蜘蛛王 — Arachnid Lord'],[100,'蜘蛛神 — Spider God']];
+function rank(l){let r=RANKS[0][1];for(const[v,n]of RANKS)if(l>=v)r=n;return r}
+
+// Nav
+function go(t){
+    document.querySelectorAll('.view,.page').forEach(e=>e.classList.remove('active'));
+    document.querySelectorAll('.n-tab').forEach(e=>e.classList.remove('active'));
+    const el=document.getElementById('v-'+t);if(el)el.classList.add('active');
+    document.querySelector(`.n-tab[data-t="${t}"]`)?.classList.add('active');
+    if(t==='models')loadModels();if(t==='settings')loadPrefs();
+    if(t==='bridge')document.getElementById('chat-in')?.focus();
+}
+
+// Ship layout
+const DL={cockpit:{x:10,y:110,w:100,h:100},scholar:{x:150,y:10,w:130,h:100},oracle:{x:150,y:210,w:130,h:100},ops:{x:310,y:100,w:110,h:110},automator:{x:460,y:10,w:120,h:100},code_team:{x:460,y:210,w:120,h:100},lab:{x:600,y:110,w:110,h:100}};
+const CONNS=[['cockpit','scholar'],['cockpit','oracle'],['scholar','ops'],['oracle','ops'],['ops','automator'],['ops','code_team'],['ops','lab'],['lab','automator'],['lab','code_team']];
+let SL={};let editing=false;
+
+function loadSL(){const s=localStorage.getItem('sw-layout');if(s)try{SL=JSON.parse(s);return}catch(e){}SL=JSON.parse(JSON.stringify(DL))}
+function saveSL(){localStorage.setItem('sw-layout',JSON.stringify(SL))}
+function applySL(){for(const[id,p]of Object.entries(SL)){const e=document.getElementById('room-'+id);if(!e)continue;e.style.cssText=`position:absolute;left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px`}drawCorr()}
+function drawCorr(){
+    const svg=document.getElementById('corr-svg');if(!svg)return;
+    let h='';
+    // Find web center (ops center or average of all rooms)
+    const ops=SL.ops;
+    const cx=ops?ops.x+ops.w/2:360, cy=ops?ops.y+ops.h/2:160;
+
+    // Draw concentric web rings
+    for(let r=60;r<=200;r+=45){
+        h+=`<circle class="web-ring" cx="${cx}" cy="${cy}" r="${r}"/>`;
+    }
+
+    // Draw radial lines from center to every room
+    for(const[id,rm] of Object.entries(SL)){
+        if(!rm)continue;
+        const rx=rm.x+rm.w/2, ry=rm.y+rm.h/2;
+        h+=`<line class="web-radial" x1="${cx}" y1="${cy}" x2="${rx}" y2="${ry}"/>`;
+    }
+
+    // Draw silk strands between connected rooms
+    for(const[a,b]of CONNS){
+        const ra=SL[a],rb=SL[b];if(!ra||!rb)continue;
+        const ax=ra.x+ra.w/2,ay=ra.y+ra.h/2,bx=rb.x+rb.w/2,by=rb.y+rb.h/2;
+        // Slight curve for organic web feel
+        const mx=(ax+bx)/2+(Math.random()-0.5)*10, my=(ay+by)/2+(Math.random()-0.5)*10;
+        h+=`<path class="corr-glow" d="M${ax},${ay} Q${mx},${my} ${bx},${by}"/>`;
+        h+=`<path class="corr-main" d="M${ax},${ay} Q${mx},${my} ${bx},${by}"/>`;
+    }
+
+    svg.innerHTML=h;
+}
+function toggleEdit(){editing=!editing;const h=document.getElementById('hull');h.classList.toggle('edit-on',editing);document.getElementById('edit-btn').classList.toggle('on',editing);document.getElementById('edit-btn').textContent=editing?'✓ Done':'🔧 Edit';document.getElementById('reset-btn').style.display=editing?'inline':'none';document.querySelectorAll('.s-room').forEach(r=>r.classList.toggle('draggable',editing))}
+function resetShip(){if(!confirm('Reset layout?'))return;SL=JSON.parse(JSON.stringify(DL));saveSL();applySL()}
+function initDrag(){const h=document.getElementById('hull');if(!h)return;h.addEventListener('pointerdown',e=>{if(!editing)return;const rm=e.target.closest('.s-room');if(!rm)return;e.preventDefault();rm.setPointerCapture(e.pointerId);const k=rm.id.replace('room-','');if(!SL[k])return;const rc=h.getBoundingClientRect();const ox=e.clientX-rc.left-SL[k].x,oy=e.clientY-rc.top-SL[k].y;rm.classList.add('dragging');const mv=ev=>{let nx=Math.round((ev.clientX-rc.left-ox)/10)*10,ny=Math.round((ev.clientY-rc.top-oy)/10)*10;nx=Math.max(0,Math.min(720-SL[k].w,nx));ny=Math.max(0,Math.min(320-SL[k].h,ny));SL[k].x=nx;SL[k].y=ny;rm.style.left=nx+'px';rm.style.top=ny+'px';drawCorr()};const up=()=>{rm.classList.remove('dragging');rm.removeEventListener('pointermove',mv);rm.removeEventListener('pointerup',up);saveSL()};rm.addEventListener('pointermove',mv);rm.addEventListener('pointerup',up)})}
+
+// Stars
+function initStars(){const el=document.getElementById('stars');if(!el)return;let h='';for(let i=0;i<60;i++){const x=Math.random()*100,y=Math.random()*100,s=Math.random()+0.5,d=Math.random()*5;h+=`<div class="star" style="left:${x}%;top:${y}%;width:${s}px;height:${s}px;animation-delay:${d}s"></div>`}el.innerHTML=h}
+
+// Agent walk system
+const HOME_ROOM={scholar:'scholar',oracle:'oracle',automator:'automator'};
+function rc(id){const r=SL[id];return r?{x:r.x+r.w/2,y:r.y+r.h/2}:{x:360,y:160}}
+function bfs(from,to){if(from===to)return[to];const adj={};for(const[a,b]of CONNS){(adj[a]=adj[a]||[]).push(b);(adj[b]=adj[b]||[]).push(a)}const q=[[from,[from]]],vis=new Set([from]);while(q.length){const[n,p]=q.shift();for(const nb of(adj[n]||[])){if(vis.has(nb))continue;const np=[...p,nb];if(nb===to)return np;vis.add(nb);q.push([nb,np])}}return[from,to]}
+function walkTo(el,wps,cb){if(!el||!wps.length)return;el.classList.remove('idle','working');el.classList.add('walking');const hull=document.getElementById('hull');if(el.parentElement!==hull){const hr=hull.getBoundingClientRect(),cr=el.getBoundingClientRect();el.style.position='absolute';el.style.left=(cr.left-hr.left)+'px';el.style.top=(cr.top-hr.top)+'px';hull.appendChild(el)}let wi=0;const SPD=1.8;(function step(){if(wi>=wps.length){el.classList.remove('walking');el.classList.add('working');if(cb)cb();return}const t=wps[wi],cx=parseFloat(el.style.left)||0,cy=parseFloat(el.style.top)||0,dx=t.x-cx,dy=t.y-cy,d=Math.sqrt(dx*dx+dy*dy);if(d<SPD*2){el.style.left=t.x+'px';el.style.top=t.y+'px';wi++;if(Math.random()<0.3){const fp=document.createElement('div');fp.className='footprint';fp.style.left=(t.x+10)+'px';fp.style.top=(t.y+34)+'px';hull.appendChild(fp);setTimeout(()=>fp.remove(),1500)}}else{el.style.left=(cx+dx/d*SPD)+'px';el.style.top=(cy+dy/d*SPD)+'px'}requestAnimationFrame(step)})()}
+function dispatch(agent,task){const el=document.getElementById('crew-'+agent);if(!el)return;const b=el.querySelector('.bubble');if(b)b.textContent=task||'working...';const path=bfs(HOME_ROOM[agent]||agent,'ops');walkTo(el,path.map(r=>rc(r)),()=>{if(b)b.textContent=task;setTimeout(()=>{if(b)b.textContent='☕ done';const hp=bfs('ops',HOME_ROOM[agent]||agent);walkTo(el,hp.map(r=>rc(r)),()=>{el.classList.remove('working','walking');el.classList.add('idle');if(b)b.textContent=''})},10000)})}
+
+// Spider bubble updates on ship
+function updateSpiderBubble(spider, text){
+    // Map spider names to crew element IDs
+    const MAP={
+        scholar:'crew-scholar',oracle:'crew-oracle',automator:'crew-automator',
+        code_team:'room-code_team',cockpit:'room-cockpit',
+    };
+    // Try crew element first (has .bubble)
+    const crewId=MAP[spider];
+    if(!crewId)return;
+
+    // For rooms (code_team, cockpit), find all crew elements inside
+    let bubbles=[];
+    const el=document.getElementById(crewId);
+    if(!el)return;
+
+    if(el.classList.contains('crew')){
+        const b=el.querySelector('.bubble');
+        if(b)bubbles=[b];
+    } else {
+        // Room — update all crew bubbles inside
+        el.querySelectorAll('.crew .bubble').forEach(b=>bubbles.push(b));
+    }
+
+    // Truncate text to fit bubble
+    const display=text.length>100?text.slice(0,97)+'...':text;
+    bubbles.forEach(b=>{
+        b.textContent=display;
+        b.style.opacity='1';
+        // Flash effect
+        b.style.transition='none';
+        b.style.background='rgba(196,30,58,0.15)';
+        setTimeout(()=>{b.style.transition='all 0.3s';b.style.background='rgba(0,0,0,0.8)'},300);
+    });
+
+    // Auto-clear bubble after 10 seconds
+    clearTimeout(el._bubbleTimer);
+    el._bubbleTimer=setTimeout(()=>{
+        bubbles.forEach(b=>{b.style.opacity='0'});
+    },10000);
+}
+
+// Stats — HUD updater
+let prevXP=0;
+async function loadStats(flash){
+    try{
+        const[sr,ar]=await Promise.all([fetch(`${A}/api/game/stats`),fetch(`${A}/api/game/achievements`)]);
+        const s=await sr.json();
+        const achs=(await ar.json()).achievements;
+        const p=s.next_level_total_xp>0?(s.xp_progress_in_level/(s.xp_progress_in_level+s.xp_to_next_level))*100:0;
+        // Nav bar
+        document.getElementById('n-lv').textContent=`Lv ${s.level}`;
+        document.getElementById('n-xp').textContent=`${s.total_xp.toLocaleString()} XP`;
+        document.getElementById('n-streak').textContent=`🔥 ${s.streak.current}`;
+        document.getElementById('n-xp-bar').style.width=Math.min(100,p)+'%';
+        // HUD level
+        document.getElementById('hud-lv').textContent=s.level;
+        document.getElementById('hud-rank').textContent=rank(s.level);
+        // HUD XP
+        document.getElementById('hud-xp-cur').textContent=s.total_xp.toLocaleString();
+        document.getElementById('hud-xp-next').textContent=`→ Lv ${s.level+1}: ${s.next_level_total_xp.toLocaleString()}`;
+        document.getElementById('hud-xp-bar').style.width=Math.min(100,p)+'%';
+        // HUD stats
+        document.getElementById('hud-streak').textContent=s.streak.current;
+        const src=s.sources||{},loc=src.local||0,tot=loc+(src.cloud||0)+(src.system||0);
+        document.getElementById('hud-local').textContent=tot>0?Math.round(loc/tot*100)+'%':'—';
+        document.getElementById('hud-msgs').textContent=tot;
+        // Ship systems
+        document.getElementById('sys-hull').style.width=Math.min(100,p)+'%';
+        document.getElementById('sys-shields').style.width=Math.min(100,(s.streak.current/30)*100)+'%';
+        document.getElementById('sys-fuel').style.width=(tot>0?Math.round(loc/tot*100):0)+'%';
+        // Achievements in HUD
+        const unlocked=achs.filter(a=>a.unlocked);
+        document.getElementById('hud-ach').innerHTML=unlocked.map(a=>`<div class="hud-badge">${a.icon} ${a.name}</div>`).join('');
+        // Casino flash on XP gain
+        if(flash && s.total_xp>prevXP){
+            const el=document.getElementById('hud-level');el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');
+        }
+        prevXP=s.total_xp;
+        return s;
+    }catch(e){return null}
+}
+
+// Agents
+async function loadAgents(){try{const r=await fetch(`${A}/api/agents`);const d=await r.json();let gm='';try{const s=await(await fetch(`${A}/api/agents/status`)).json();gm=s.gpu?.tracked_model||''}catch(e){}['scholar','automator','oracle'].forEach(n=>{const a=d.agents.find(x=>x.name===n);if(!a)return;const el=document.getElementById('rm-'+n);if(el)el.textContent=a.local_model;const pp=document.getElementById('rp-'+n);const act=gm&&a.local_model===gm;if(pp)pp.innerHTML=act?'<div class="pip on"></div><div class="pip on"></div><div class="pip on"></div>':'<div class="pip"></div><div class="pip"></div><div class="pip"></div>';const rm=document.getElementById('room-'+n);if(rm)rm.classList.toggle('active',act);const cr=document.getElementById('crew-'+n);if(cr){cr.classList.toggle('working',act);cr.classList.toggle('idle',!act)}})}catch(e){}}
+
+// Models
+async function loadModels(){try{const r=await fetch(`${A}/api/models`);const d=await r.json();document.getElementById('m-tbody').innerHTML=d.models.map(m=>{const gb=(m.size/1073741824).toFixed(1);const dt=m.details||{};return`<tr><td class="m-name">${m.name}</td><td>${gb} GB</td><td style="color:var(--dim)">${dt.family||'—'}</td><td style="color:var(--dim)">${dt.parameter_size||'—'}</td><td class="m-asgn">${m.assigned_to||'—'}</td><td><button class="m-btn" onclick="openM('${m.name}')">Assign</button></td></tr>`}).join('')}catch(e){}}
+function openM(n){document.getElementById('asgn-m').value=n;document.getElementById('asgn-modal').classList.add('show')}
+function closeM(){document.getElementById('asgn-modal').classList.remove('show')}
+async function doAsgn(){const m=document.getElementById('asgn-m').value,a=document.getElementById('asgn-a').value;await fetch(`${A}/api/models/assign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:m,agent:a})});closeM();loadModels();loadAgents()}
+
+// Chat — SSE streaming
+async function send(){
+    const inp=document.getElementById('chat-in'),btn=document.getElementById('send-btn');
+    const msg=inp.value.trim();if(!msg)return;
+    inp.value='';btn.disabled=true;
+    addM('user',msg);
+    const ae=addM('assistant','<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>');
+    const bd=ae.querySelector('.msg-body');
+    const tg=ae.querySelector('.tag');
+    let rawText='',agent='',dispatched=false;
+
+    try{
+        const params=new URLSearchParams({message:msg});
+        if(sid)params.set('session_id',sid);
+        const resp=await fetch(`${A}/api/chat/stream?${params}`);
+        const reader=resp.body.getReader();
+        const decoder=new TextDecoder();
+        let buf='',curEvent='';
+
+        while(true){
+            const{done,value}=await reader.read();
+            if(done)break;
+            buf+=decoder.decode(value,{stream:true});
+            const lines=buf.split('\n');
+            buf=lines.pop()||'';
+
+            for(const line of lines){
+                if(line.startsWith('event:')){curEvent=line.slice(6).trim();continue}
+                if(!line.startsWith('data:'))continue;
+                let data;try{data=JSON.parse(line.slice(5).trim())}catch(e){continue}
+
+                if(curEvent==='spider'){
+                    const spider=data.spider;
+                    const text=data.text;
+                    updateSpiderBubble(spider,text);
+                    // Pulse room while loading
+                    const roomEl=document.getElementById('room-'+spider);
+                    if(roomEl){
+                        if(text.includes('Loading')||text.includes('⏳')){
+                            roomEl.classList.add('loading');
+                        }else{
+                            roomEl.classList.remove('loading');
+                        }
+                    }
+                    continue;
+                }
+                if(curEvent==='token'){
+                    const chunk=data.text||'';
+                    if(!sid)sid=data.session_id;
+
+                    // Detect agent from routing tag *[agent · mode]*
+                    if(rawText.length<5 && chunk.startsWith('*[')){
+                        const full=chunk;
+                        const end=full.indexOf(']*');
+                        if(end>0){
+                            agent=full.substring(2,end).split('·')[0].trim();
+                            tg.textContent=agent;
+                            tg.className='tag '+agent.replace(/\s/g,'_').toLowerCase();
+                            // Dispatch spider to Ops Center
+                            const TH={scholar:'📚 researching...',oracle:'🍵 thinking...',automator:'⚙️ executing...',code_team:'💻 coding...'};
+                            if(!dispatched&&TH[agent]){dispatch(agent,TH[agent]);dispatched=true}
+                            rawText+=chunk;
+                            continue; // Don't render the routing tag
+                        }
+                    }
+
+                    rawText+=chunk;
+                    // Strip routing tag from display
+                    let display=rawText;
+                    if(display.startsWith('*[')){
+                        const tagEnd=display.indexOf(']*\n');
+                        if(tagEnd>0)display=display.substring(tagEnd+3);
+                    }
+                    bd.innerHTML=fmt(display);
+                    scr();
+                }
+                else if(curEvent==='done'){
+                    sid=data.session_id;
+                    // XP toast + sound
+                    const xp=data.xp;
+                    if(xp&&xp.xp_earned){
+                        const ml=xp.multiplier>1?` (${xp.multiplier}x)`:'';
+                        bd.innerHTML+=`<div class="xp-toast">+${xp.xp_earned} XP${ml} · Lv ${xp.level} · ${xp.total_xp.toLocaleString()}</div>`;
+                        sfxXP();
+                        checkLevelUp(xp.level);
+                        updateCombo();
+                    }
+                    // Achievement toasts + sound
+                    if(data.achievements&&data.achievements.length>0){
+                        for(const a of data.achievements)
+                            bd.innerHTML+=`<div class="ach-toast">${a.icon} ${a.name}</div>`;
+                        sfxAchievement();
+                    }
+
+                    loadStats(true);loadAgents();
+                }
+            }
+        }
+        saveChat();
+    }catch(e){
+        bd.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span><br><button class="retry-btn" onclick="this.parentElement.parentElement.remove();document.getElementById('chat-in').value='${msg.replace(/'/g,"\\'")}';send()">Retry</button>`;
+    }
+    btn.disabled=false;inp.focus();scr();
+}
+function addM(r,h){const b=document.getElementById('chat-msgs');const e=document.createElement('div');e.className='msg '+r;e.innerHTML=r==='assistant'?`<div class="tag"></div><div class="msg-body">${h}</div>`:`<div class="msg-body">${h}</div>`;b.appendChild(e);scr();return e}
+function scr(){const b=document.getElementById('chat-msgs');requestAnimationFrame(()=>b.scrollTop=b.scrollHeight)}
+function fmt(t){
+    return t
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g,'<img src="$2" alt="$1" style="max-width:100%;border-radius:4px;margin:0.5rem 0;border:1px solid var(--border)" />')
+        .replace(/```(\w*)\n([\s\S]*?)```/g,(m,lang,code)=>{
+            const escaped=code.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const id='cp'+Math.random().toString(36).slice(2,8);
+            return `<pre><button class="copy-btn" onclick="copyCode(this,'${id}')" id="${id}">Copy</button><code>${escaped}</code></pre>`;
+        })
+        .replace(/`([^`]+)`/g,'<code>$1</code>')
+        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g,'<em>$1</em>')
+        .replace(/^#### (.+)$/gm,'<h4>$1</h4>')
+        .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+        .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+        .replace(/^- (.+)$/gm,'<div style="padding-left:1em">• $1</div>')
+        .replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
+}
+function copyCode(btn,id){
+    const pre=btn.parentElement;
+    const code=pre.querySelector('code').textContent;
+    navigator.clipboard.writeText(code).then(()=>{
+        btn.textContent='Copied!';btn.classList.add('copied');
+        setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied')},1500);
+    });
+}
+
+// ===== CONVERSATION MANAGEMENT =====
+let convos=JSON.parse(localStorage.getItem('sw-convos')||'[]');
+let activeConvo=localStorage.getItem('sw-active-convo')||null;
+
+function saveChat(){
+    const msgs=document.getElementById('chat-msgs');
+    const html=msgs.innerHTML;
+    if(!activeConvo){
+        // Create new conversation entry
+        activeConvo='c_'+Date.now();
+        // Auto-title from first user message
+        const firstMsg=msgs.querySelector('.msg.user .msg-body');
+        const title=firstMsg?firstMsg.textContent.slice(0,40):'New conversation';
+        convos.unshift({id:activeConvo, title, time:Date.now(), sid:sid});
+    }
+    // Update existing convo
+    const c=convos.find(x=>x.id===activeConvo);
+    if(c){c.sid=sid;c.time=Date.now()}
+    localStorage.setItem('sw-convo-'+activeConvo, html);
+    localStorage.setItem('sw-convos', JSON.stringify(convos));
+    localStorage.setItem('sw-active-convo', activeConvo);
+    renderConvoList();
+}
+
+function loadChat(){
+    activeConvo=localStorage.getItem('sw-active-convo')||null;
+    if(activeConvo){
+        const html=localStorage.getItem('sw-convo-'+activeConvo);
+        if(html) document.getElementById('chat-msgs').innerHTML=html;
+        const c=convos.find(x=>x.id===activeConvo);
+        if(c&&c.sid) sid=c.sid;
+    }
+    renderConvoList();
+}
+
+function switchConvo(id){
+    // Save current first
+    if(activeConvo){
+        localStorage.setItem('sw-convo-'+activeConvo, document.getElementById('chat-msgs').innerHTML);
+    }
+    activeConvo=id;
+    localStorage.setItem('sw-active-convo', id);
+    const html=localStorage.getItem('sw-convo-'+id);
+    if(html) document.getElementById('chat-msgs').innerHTML=html;
+    const c=convos.find(x=>x.id===id);
+    sid=c?.sid||null;
+    renderConvoList();
+    scr();
+}
+
+function newConvo(){
+    // Save current
+    if(activeConvo){
+        localStorage.setItem('sw-convo-'+activeConvo, document.getElementById('chat-msgs').innerHTML);
+    }
+    if(sid)fetch(`${A}/api/chat/${sid}`,{method:'DELETE'}).catch(()=>{});
+    activeConvo=null; sid=null;
+    document.getElementById('chat-msgs').innerHTML='<div class="msg assistant"><div class="tag system">いらっしゃいませ</div><div class="msg-body">New conversation. What do you need?</div></div>';
+    renderConvoList();
+}
+// Keep old newChat for the + New button in chat header
+function newChat(){newConvo()}
+
+function deleteConvo(id,e){
+    e.stopPropagation();
+    convos=convos.filter(x=>x.id!==id);
+    localStorage.removeItem('sw-convo-'+id);
+    localStorage.setItem('sw-convos',JSON.stringify(convos));
+    if(activeConvo===id){activeConvo=null;newConvo()}
+    renderConvoList();
+}
+
+function renderConvoList(){
+    const list=document.getElementById('convo-list');
+    if(!list)return;
+    list.innerHTML=convos.slice(0,20).map(c=>{
+        const active=c.id===activeConvo?'active':'';
+        const ago=timeAgo(c.time);
+        return `<div class="conv-item ${active}" onclick="switchConvo('${c.id}')" title="${c.title}">
+            ${c.title}<span class="ci-time">${ago}</span>
+        </div>`;
+    }).join('')||'<div style="font-size:0.55rem;color:var(--dim2);padding:0.5rem">No conversations yet</div>';
+}
+
+function timeAgo(ts){
+    const d=Date.now()-ts;
+    if(d<60000)return 'now';
+    if(d<3600000)return Math.floor(d/60000)+'m';
+    if(d<86400000)return Math.floor(d/3600000)+'h';
+    return Math.floor(d/86400000)+'d';
+}
+document.getElementById('chat-in').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+
+// Sound effects disabled — user preference
+function sfxXP(){}
+function sfxLevelUp(){}
+function sfxAchievement(){}
+function sfxCombo(){}
+
+// ===== COMBO SYSTEM =====
+let lastMsgTime=0,comboCount=0,comboTimer=null;
+function updateCombo(){
+    const now=Date.now();
+    if(now-lastMsgTime<60000&&lastMsgTime>0){
+        comboCount++;
+        if(comboCount>=2){
+            const badge=document.getElementById('combo-badge');
+            const mult=comboCount>=5?'3x':comboCount>=3?'2x':'1.5x';
+            badge.textContent=`🔥 ${mult} COMBO (${comboCount})`;
+            badge.classList.add('show');
+            sfxCombo();
+            clearTimeout(comboTimer);
+            comboTimer=setTimeout(()=>{badge.classList.remove('show');comboCount=0},3000);
+        }
+    }else{comboCount=1}
+    lastMsgTime=now;
+}
+
+// ===== LEVEL UP DETECTION =====
+let prevLevel=0;
+function checkLevelUp(newLevel){
+    if(newLevel>prevLevel&&prevLevel>0){
+        // LEVEL UP!
+        sfxLevelUp();
+        document.body.classList.add('screen-shake');
+        document.getElementById('hud')?.classList.add('level-up-flash');
+        setTimeout(()=>{document.body.classList.remove('screen-shake');document.getElementById('hud')?.classList.remove('level-up-flash')},800);
+    }
+    prevLevel=newLevel;
+}
+
+// ===== FIRST-LAUNCH SETUP =====
+async function checkSetup(){
+    try{
+        const r=await fetch(`${A}/api/config`);
+        const d=await r.json();
+        if(!d.has_anthropic&&!localStorage.getItem('sw-setup-skipped')){
+            document.getElementById('setup-modal').classList.add('show');
+        }
+    }catch(e){}
+}
+function closeSetup(){
+    document.getElementById('setup-modal').classList.remove('show');
+    localStorage.setItem('sw-setup-skipped','1');
+}
+async function saveSetup(){
+    const ak=document.getElementById('setup-anthropic').value.trim();
+    const ok=document.getElementById('setup-openai').value.trim();
+    if(!ak&&!ok){closeSetup();return}
+    try{
+        await fetch(`${A}/api/config/keys`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({anthropic_key:ak,openai_key:ok})});
+        document.getElementById('setup-modal').classList.remove('show');
+        // Show restart notice
+        const msgs=document.getElementById('chat-msgs');
+        msgs.innerHTML+='<div class="msg assistant"><div class="tag system">setup</div><div class="msg-body">Keys saved. <strong>Restart the server</strong> to enable Opus validation: <code>hub serve</code></div></div>';
+    }catch(e){alert('Failed to save: '+e.message)}
+}
+
+// ===== PREFERENCES =====
+async function loadPrefs(){
+    try{
+        const r=await fetch(`${A}/api/preferences`);
+        const p=await r.json();
+        document.getElementById('pref-username').value=p.username||'';
+        document.getElementById('pref-language').value=p.preferred_language||'Python';
+        document.getElementById('pref-focus').value=p.current_focus||'';
+        document.getElementById('pref-dirs').value=(p.project_dirs||[]).join(', ');
+        document.getElementById('pref-style').value=p.response_style||'concise';
+        document.getElementById('pref-explain').checked=p.explain_code!==false;
+        document.getElementById('pref-japanese').checked=p.use_japanese!==false;
+        document.getElementById('pref-autoexec').checked=p.auto_execute!==false;
+        document.getElementById('pref-rag').checked=p.scholar_use_rag!==false;
+        document.getElementById('pref-terminal').checked=!!p.terminal_only;
+        document.getElementById('pref-review').value=p.opus_review_level||'thorough';
+        document.getElementById('pref-rounds').value=String(p.code_team_rounds||3);
+        document.getElementById('pref-m-scholar').value=p.scholar_model||'';
+        document.getElementById('pref-m-automator').value=p.automator_model||'';
+        document.getElementById('pref-m-oracle').value=p.oracle_model||'';
+        document.getElementById('pref-m-coder').value=p.coder_model||'';
+    }catch(e){console.error('Failed to load prefs:',e)}
+}
+async function savePrefs(){
+    const p={
+        username:document.getElementById('pref-username').value,
+        preferred_language:document.getElementById('pref-language').value,
+        current_focus:document.getElementById('pref-focus').value,
+        project_dirs:document.getElementById('pref-dirs').value.split(',').map(s=>s.trim()).filter(Boolean),
+        response_style:document.getElementById('pref-style').value,
+        explain_code:document.getElementById('pref-explain').checked,
+        use_japanese:document.getElementById('pref-japanese').checked,
+        auto_execute:document.getElementById('pref-autoexec').checked,
+        scholar_use_rag:document.getElementById('pref-rag').checked,
+        terminal_only:document.getElementById('pref-terminal').checked,
+        opus_review_level:document.getElementById('pref-review').value,
+        code_team_rounds:parseInt(document.getElementById('pref-rounds').value),
+        scholar_model:document.getElementById('pref-m-scholar').value,
+        automator_model:document.getElementById('pref-m-automator').value,
+        oracle_model:document.getElementById('pref-m-oracle').value,
+        coder_model:document.getElementById('pref-m-coder').value,
+    };
+    try{
+        await fetch(`${A}/api/preferences`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+        // Flash save confirmation
+        const btn=document.querySelector('#v-settings .btn-p');
+        btn.textContent='✓ Saved';setTimeout(()=>btn.textContent='Save Settings',1500);
+    }catch(e){alert('Failed: '+e.message)}
+}
+
+// Init
+loadSL();applySL();initDrag();initStars();loadStats();loadAgents();loadChat();checkSetup();
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+:host {
+    --brand-primary: #03c78d;
+    --brand-primary-hover: #039670;
+    --brand-text: #282828;
+    --brand-text-mute: #b7b7b7;
+    --brand-border-soft: #ebebeb;
+}
+
+.team-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 0.25rem 0.75rem;
+}
+
+.team-cell {
+    flex: 1 1 auto;
+    min-width: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0.4rem 0.5rem;
+    border-right: 1px solid var(--brand-border-soft);
+}
+
+.team-cell:last-child {
+    border-right: none;
+}
+
+.team-role {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-text-mute);
+    margin-bottom: 2px;
+}
+
+.team-name {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--brand-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+
+.team-name-unassigned {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--brand-text-mute);
+    font-style: italic;
+}
+
+.change-link {
+    font-size: 0.65rem;
+    color: var(--brand-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.change-link:hover {
+    color: var(--brand-primary-hover);
+    text-decoration: underline;
+}
+
+.edit-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 8999;
+    background: transparent;
+}
+
+.picker-row {
+    position: relative;
+    z-index: 9000;
+    min-width: 200px;
+}

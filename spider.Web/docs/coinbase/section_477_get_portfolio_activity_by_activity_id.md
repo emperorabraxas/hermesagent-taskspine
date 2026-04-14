@@ -1,0 +1,85 @@
+# Get Portfolio Activity by Activity ID
+Source: https://docs.cdp.coinbase.com/api-reference/prime-api/rest-api/activities/get-portfolio-activity-by-activity-id
+
+GET /v1/portfolios/{portfolio_id}/activities/{activity_id}
+Retrieve an activity by its activity ID
+
+Use the Prime SDK or CLI to test this endpoint by following the [quickstart](/prime/introduction/quickstart) guide and running with the following examples
+
+<Tabs>
+  <Tab title="Java">
+    ```java theme={null}
+    ActivitiesService activitiesService = PrimeServiceFactory.createActivitiesService(client);
+    GetActivityByActivityIdRequest request = new GetActivityByActivityIdRequest("portfolio_id", "activity_id");
+    GetActivityByActivityIdResponse response = activitiesService.getActivityByActivityId(request);
+    ```
+
+    For more information, please visit the [Prime Java SDK](https://github.com/coinbase-samples/prime-sdk-java).
+  </Tab>
+
+  <Tab title=".NET">
+    ```csharp wrap theme={null}
+    var activitiesService = new ActivitiesService(client);
+
+    var request = new GetActivityByActivityIdRequest("portfolio_id", "activity_id");
+
+    var response = activitiesService.GetActivityByActivityId(request);
+    ```
+
+    For more information, please visit the [Prime .NET SDK](https://github.com/coinbase-samples/prime-sdk-dotnet).
+  </Tab>
+
+  <Tab title="Go">
+    ```go wrap theme={null}
+    activitiesService := activities.NewActivitiesService(client)
+
+    request := &activities.GetActivityRequest{
+        PortfolioId: "portfolio-id",
+        Id:          "activity-id",
+    }
+
+    response, err := activitiesService.GetActivity(context.Background(), request)
+    ```
+
+    For more information, please visit the [Prime Go SDK](https://github.com/coinbase-samples/prime-sdk-go).
+  </Tab>
+
+  <Tab title="Python">
+    ```python wrap theme={null}
+    prime_client = PrimeClient(credentials)
+
+    request = GetActivityRequest(
+        portfolio_id="portfolio-id",
+        activity_id="activity-id",
+    )
+
+    response = prime_client.get_activity(request)ty(request)
+    ```
+
+    For more information, please visit the [Prime Python SDK](https://github.com/coinbase-samples/prime-sdk-py).
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash wrap theme={null}
+    primectl get-activity --help
+    ```
+
+    For more information, please visit the [Prime CLI](https://github.com/coinbase-samples/prime-cli).
+  </Tab>
+
+  <Tab title="TS/JS">
+    ```typescript wrap theme={null}
+    const activitiesService = new ActivitiesService(client);
+
+    activitiesService.getPortfolioActivity({
+        portfolioId: 'PORTFOLIO_ID_HERE',
+        activityId: 'ACTIVITY_ID_HERE'
+    }).then(async (response) => {
+        console.log('Activity: ', response);
+    })
+    ```
+
+    For more information, please visit the [Prime TS SDK](https://github.com/coinbase-samples/prime-sdk-ts).
+  </Tab>
+</Tabs>
+

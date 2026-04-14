@@ -1,0 +1,23 @@
+# AuthenticateWithJWTResult
+Source: https://docs.cdp.coinbase.com/sdks/cdp-sdks-v2/frontend/@coinbase/cdp-core/Type-Aliases/AuthenticateWithJWTResult
+
+
+
+```ts theme={null}
+type AuthenticateWithJWTResult = {
+  user: User;
+  message: string;
+  isNewUser: boolean;
+};
+```
+
+Result from authenticating with a developer-issued JWT.
+
+## Properties
+
+| Property          | Type                                                                      | Description                          |
+| ----------------- | ------------------------------------------------------------------------- | ------------------------------------ |
+| <a /> `user`      | [`User`](/sdks/cdp-sdks-v2/frontend/@coinbase/cdp-core/Type-Aliases/User) | The successfully logged-in user.     |
+| <a /> `message`   | `string`                                                                  | The message to display to the user.  |
+| <a /> `isNewUser` | `boolean`                                                                 | Whether the user is newly signed up. |
+

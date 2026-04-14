@@ -613,6 +613,18 @@ def _setup_taskspine_cmd(subparser) -> None:
         help="Include installed Ollama model names as candidates (no HF mapping).",
     )
 
+    latest = models_sub.add_parser("openai-latest", help="Resolve the latest OpenAI model id via /models")
+    latest.add_argument(
+        "--openai-base-url",
+        default=os.environ.get("TASKSPINE_MID_OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        help="OpenAI API base URL (default: https://api.openai.com/v1).",
+    )
+    latest.add_argument(
+        "--openai-token-env",
+        default="OPENAI_API_KEY",
+        help="Env var name containing OpenAI API key.",
+    )
+
 
 def _handle_taskspine_cmd(args) -> None:
     if args.taskspine_cmd == "models" and args.models_cmd == "suggest":
@@ -637,6 +649,12 @@ def _handle_taskspine_cmd(args) -> None:
             w_chat=float(args.w_chat),
         )
         print(json.dumps(result, indent=2, sort_keys=True))
+        return
+
+    if args.taskspine_cmd == "models" and args.models_cmd == "openai-latest":
+        key = os.environ.get(args.openai_token_env, "").strip() or None
+        model_id, err = resolve_latest_openai_model(key, base_url=str(args.openai_base_url))
+        print(json.dumps({"model": model_id, "error": err, "base_url": args.openai_base_url}, indent=2, sort_keys=True))
         return
 
     raise SystemExit("Unknown taskspine subcommand")

@@ -1,0 +1,14 @@
+[Unit]
+Description=HermesAgent GitHub Webhook Receiver
+After=network.target
+
+[Service]
+Type=simple
+Environment=HERMES_GITHUB_WEBHOOK_SECRET=CHANGE_ME
+ExecStart=/usr/bin/env hermes webhook serve --host 127.0.0.1 --port 8787 --path /github/webhook
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+

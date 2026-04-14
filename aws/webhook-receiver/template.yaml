@@ -1,0 +1,168 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "HermesAgent GitHub webhook receiver (HTTP API + Lambda + SSM secret)"
+
+Parameters:
+  SecretParamName:
+    Type: String
+    Default: "/hermes-agent/github-webhook/secret"
+    Description: "SSM parameter name (SecureString) containing the GitHub webhook secret"
+
+Resources:
+  WebhookFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: webhook-logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+        - PolicyName: webhook-ssm
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretParamName}"
+              # SecureString decrypt uses the account's default KMS key unless overridden.
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: "*"
+
+  WebhookFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 15
+      MemorySize: 256
+      Role: !GetAtt WebhookFunctionRole.Arn
+      Environment:
+        Variables:
+          SECRET_PARAM_NAME: !Ref SecretParamName
+      Code:
+        ZipFile: |
+          import base64
+          import hashlib
+          import hmac
+          import json
+          import os
+          import time
+          import boto3
+          
+          ssm = boto3.client("ssm")
+          _secret_cache = None
+          
+          def _get_secret():
+            global _secret_cache
+            if _secret_cache is not None:
+              return _secret_cache
+            name = os.environ.get("SECRET_PARAM_NAME", "")
+            if not name:
+              raise RuntimeError("SECRET_PARAM_NAME missing")
+            resp = ssm.get_parameter(Name=name, WithDecryption=True)
+            _secret_cache = (resp.get("Parameter", {}) or {}).get("Value", "")
+            return _secret_cache
+          
+          def _bad(status, msg):
+            return {"statusCode": status, "headers": {"content-type": "application/json"}, "body": json.dumps({"ok": False, "error": msg})}
+          
+          def handler(event, context):
+            # HTTP API v2 payload
+            headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+            if event.get("requestContext", {}).get("http", {}).get("method") != "POST":
+              return _bad(405, "method not allowed")
+          
+            raw = event.get("body") or ""
+            body = base64.b64decode(raw) if event.get("isBase64Encoded") else raw.encode("utf-8")
+          
+            sig = headers.get("x-hub-signature-256", "")
+            if not sig.startswith("sha256="):
+              return _bad(401, "missing signature")
+            got = sig.split("=", 1)[1].strip()
+          
+            secret = _get_secret().encode("utf-8")
+            mac = hmac.new(secret, msg=body, digestmod=hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(mac, got):
+              return _bad(401, "invalid signature")
+          
+            gh_event = headers.get("x-github-event", "unknown")
+            delivery = headers.get("x-github-delivery", "unknown")
+          
+            try:
+              payload = json.loads(body.decode("utf-8"))
+            except Exception:
+              payload = {"_raw": body.decode("utf-8", errors="replace")}
+          
+            # Store in logs (you can later add S3/SQS without changing GitHub)
+            record = {
+              "received_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+              "event": gh_event,
+              "delivery": delivery,
+              "payload": payload,
+            }
+            print(json.dumps(record))
+          
+            return {"statusCode": 200, "headers": {"content-type": "application/json"}, "body": json.dumps({"ok": True})}
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: hermesagent-taskspine-webhook
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowMethods: ["POST"]
+        AllowOrigins: ["*"]
+
+  HttpApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: "$default"
+      AutoDeploy: true
+
+  HttpApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt WebhookFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  HttpApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "POST /github/webhook"
+      Target: !Sub "integrations/${HttpApiIntegration}"
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WebhookFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/github/webhook"
+
+Outputs:
+  WebhookUrl:
+    Description: "GitHub webhook URL to paste into repo settings"
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/github/webhook"
+  SecretParamNameOut:
+    Description: "SSM parameter that must contain the webhook secret (SecureString)"
+    Value: !Ref SecretParamName
+

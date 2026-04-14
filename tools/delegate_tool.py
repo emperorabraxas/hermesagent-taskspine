@@ -760,8 +760,15 @@ def delegate_task(
             # Local endpoints (Ollama, LM Studio, etc.) often don't require an API key
             # but the OpenAI client expects a non-empty string. Provide a harmless
             # placeholder when none is set.
-            if effective_base_url and not effective_api_key and _is_local_base_url(effective_base_url):
-                effective_api_key = "local"
+            if effective_base_url and not effective_api_key:
+                if _is_local_base_url(effective_base_url):
+                    effective_api_key = "local"
+                else:
+                    # Remote OpenAI-compatible endpoints generally require an API key.
+                    # Reuse the conventional env var when the caller didn't pass one.
+                    env_key = os.getenv("OPENAI_API_KEY", "").strip()
+                    if env_key:
+                        effective_api_key = env_key
 
             child = _build_child_agent(
                 task_index=i, goal=t["goal"], context=t.get("context"),

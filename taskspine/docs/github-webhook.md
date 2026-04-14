@@ -73,6 +73,14 @@ platforms:
       default_route: github
 ```
 
+Cloudflare Tunnel example config:
+
+- `taskspine/infra/cloudflare/tunnel.config.example.yml`
+
+Optional (Taskspine plugin): set your public webhook URL so Hermes can echo it in the routing policy block:
+
+`TASKSPINE_WEBHOOK_PUBLIC_URL=https://hooks.wirelash.dev/github/webhook`
+
 ## Create the GitHub webhook (via `gh`)
 
 Use:

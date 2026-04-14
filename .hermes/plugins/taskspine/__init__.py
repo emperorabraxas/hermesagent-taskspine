@@ -5,6 +5,7 @@ import os
 import platform
 import re
 import subprocess
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -17,6 +18,10 @@ DEFAULT_LEADERBOARD_SPLIT = "train"
 DEFAULT_CODING_METRIC = "sweVerified_score"
 DEFAULT_TOOL_USE_METRIC = "terminalBench_score"
 DEFAULT_CHAT_METRIC = "aggregate_score"
+
+_LEADERBOARD_CACHE: Dict[str, Any] = {"ts": 0.0, "rows": None, "err": None}
+_OPENAI_MODELS_CACHE: Dict[str, Any] = {"ts": 0.0, "models": None, "err": None}
+_CACHE_TTL_SECONDS = 6 * 60 * 60  # 6 hours
 
 
 @dataclass(frozen=True)
@@ -190,6 +195,175 @@ def _leaderboard_scores_for_candidate(
                 None,
             )
     return None, "no leaderboard match"
+
+def _get_leaderboard_index(
+    dataset: str,
+    config: str,
+    split: str,
+    hf_token: Optional[str],
+) -> Tuple[Dict[str, Dict[str, Any]], Optional[str], int]:
+    """Return (index, error, rows_loaded) with caching."""
+    now = time.time()
+    cache_key = f"{dataset}|{config}|{split}|{bool(hf_token)}"
+    cached = _LEADERBOARD_CACHE.get("key") == cache_key and (now - float(_LEADERBOARD_CACHE.get("ts") or 0.0)) < _CACHE_TTL_SECONDS
+    if cached and isinstance(_LEADERBOARD_CACHE.get("rows"), list):
+        rows = _LEADERBOARD_CACHE["rows"]
+        return _index_leaderboard_rows(rows), _LEADERBOARD_CACHE.get("err"), len(rows)
+
+    rows, err = _fetch_hf_dataset_rows(dataset=dataset, config=config, split=split, hf_token=hf_token)
+    _LEADERBOARD_CACHE.update({"key": cache_key, "ts": now, "rows": rows, "err": err})
+    return _index_leaderboard_rows(rows), err, len(rows)
+
+
+def _fetch_openai_models(api_key: str, base_url: str = "https://api.openai.com/v1") -> Tuple[Optional[List[Dict[str, Any]]], Optional[str]]:
+    """Fetch OpenAI model list (used only to resolve 'latest')."""
+    try:
+        import requests  # Hermes dependency
+    except Exception as e:
+        return None, f"requests not available: {e}"
+
+    base = (base_url or "").rstrip("/")
+    try:
+        resp = requests.get(
+            f"{base}/models",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=8,
+        )
+        if resp.status_code >= 400:
+            return None, f"OpenAI models HTTP {resp.status_code}"
+        data = resp.json() or {}
+        models = data.get("data")
+        if not isinstance(models, list):
+            return None, "OpenAI models: unexpected payload"
+        return models, None
+    except Exception as e:
+        return None, str(e)
+
+
+def resolve_latest_openai_model(api_key: Optional[str], base_url: str = "https://api.openai.com/v1") -> Tuple[Optional[str], Optional[str]]:
+    """Resolve the most recently created GPT-family model id."""
+    if not api_key:
+        return None, "OPENAI_API_KEY missing"
+    now = time.time()
+    cache_key = f"{base_url}|{api_key[:6]}"
+    cached = _OPENAI_MODELS_CACHE.get("key") == cache_key and (now - float(_OPENAI_MODELS_CACHE.get("ts") or 0.0)) < _CACHE_TTL_SECONDS
+    if cached and isinstance(_OPENAI_MODELS_CACHE.get("models"), list):
+        models = _OPENAI_MODELS_CACHE["models"]
+    else:
+        models, err = _fetch_openai_models(api_key=api_key, base_url=base_url)
+        _OPENAI_MODELS_CACHE.update({"key": cache_key, "ts": now, "models": models, "err": err})
+        if err:
+            return None, err
+        if not models:
+            return None, "OpenAI models empty"
+
+    def is_candidate(mid: str) -> bool:
+        m = mid.lower()
+        if not (m.startswith("gpt-") or m.startswith("o")):
+            return False
+        if any(x in m for x in ("whisper", "tts", "dall-e", "embedding", "moderation", "realtime", "transcribe", "audio")):
+            return False
+        return True
+
+    best_id = None
+    best_created = -1
+    for m in models:
+        mid = m.get("id")
+        created = m.get("created")
+        if not isinstance(mid, str) or not mid.strip():
+            continue
+        if not is_candidate(mid):
+            continue
+        try:
+            c = int(created) if isinstance(created, (int, float, str)) and str(created).isdigit() else 0
+        except Exception:
+            c = 0
+        if c > best_created:
+            best_created = c
+            best_id = mid
+    if not best_id:
+        return None, "No suitable GPT-family model found"
+    return best_id, None
+
+
+def build_taskspine_routing_context() -> str:
+    """Return a short routing policy block for injection via pre_llm_call."""
+    # Webhook URL is user-controlled; keep it explicit.
+    webhook_url = os.environ.get("TASKSPINE_WEBHOOK_PUBLIC_URL", "").strip()
+
+    # Low lane: local Ollama
+    low_base_url = os.environ.get("TASKSPINE_LOW_BASE_URL", "http://127.0.0.1:11434/v1").strip()
+    hf_token = os.environ.get("HF_TOKEN", "").strip() or None
+    dataset = os.environ.get("TASKSPINE_LEADERBOARD_DATASET", DEFAULT_LEADERBOARD_DATASET).strip()
+    config = os.environ.get("TASKSPINE_LEADERBOARD_CONFIG", DEFAULT_LEADERBOARD_CONFIG).strip()
+    split = os.environ.get("TASKSPINE_LEADERBOARD_SPLIT", DEFAULT_LEADERBOARD_SPLIT).strip()
+    coding_metric = os.environ.get("TASKSPINE_CODING_METRIC", DEFAULT_CODING_METRIC).strip()
+    tool_metric = os.environ.get("TASKSPINE_TOOL_USE_METRIC", DEFAULT_TOOL_USE_METRIC).strip()
+    chat_metric = os.environ.get("TASKSPINE_CHAT_METRIC", DEFAULT_CHAT_METRIC).strip()
+
+    candidates = [{"name": n, "hf": ""} for n in _try_list_ollama_models()]
+    system = detect_system_profile()
+
+    lb_index, lb_err, lb_rows = _get_leaderboard_index(dataset, config, split, hf_token)
+    low_model = os.environ.get("TASKSPINE_LOW_MODEL", "").strip() or None
+    if not low_model and candidates and lb_index:
+        # Prefer models that match the leaderboard; otherwise just pick the first installed.
+        best_score = None
+        best_name = None
+        for c in candidates:
+            lb, _ = _leaderboard_scores_for_candidate(c, lb_index, coding_metric, tool_metric, chat_metric)
+            if not lb:
+                continue
+            # Default: equal weights.
+            parts = [v for v in (lb.get("coding"), lb.get("tool_use"), lb.get("general_chat")) if isinstance(v, (int, float))]
+            if not parts:
+                continue
+            score = sum(float(x) for x in parts) / float(len(parts))
+            if best_score is None or score > best_score:
+                best_score = score
+                best_name = c["name"]
+        low_model = best_name or (candidates[0]["name"] if candidates else None)
+    if not low_model and candidates:
+        low_model = candidates[0]["name"]
+
+    # Mid lane: OpenAI latest
+    openai_base = os.environ.get("TASKSPINE_MID_OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip() or None
+    mid_model = os.environ.get("TASKSPINE_MID_OPENAI_MODEL", "latest").strip()
+    if mid_model.lower() == "latest":
+        resolved, _err = resolve_latest_openai_model(openai_key, base_url=openai_base)
+        if resolved:
+            mid_model = resolved
+
+    # High lane: Claude Code (ACP) using Opus 4.6
+    high_acp_cmd = os.environ.get("TASKSPINE_HIGH_ACP_COMMAND", "claude").strip()
+    high_model = os.environ.get("TASKSPINE_HIGH_MODEL", "claude-opus-4-6").strip()
+    high_acp_args = os.environ.get("TASKSPINE_HIGH_ACP_ARGS", "").strip()
+    if high_acp_args:
+        # Split on whitespace (simple), user can override precisely if needed.
+        acp_args = high_acp_args.split()
+    else:
+        acp_args = ["--acp", "--stdio", "--model", high_model]
+
+    lines: List[str] = []
+    lines.append("[TASKSPINE ROUTING]")
+    lines.append(f"- System: CPU-only, ~{system.mem_total_gib:.1f} GiB RAM.")
+    if webhook_url:
+        lines.append(f"- GitHub webhook URL (public HTTPS): {webhook_url}")
+    lines.append("- Low lane (local): use delegate_task with base_url/model for cheap drafting.")
+    if low_model:
+        lines.append(f"  - base_url={low_base_url} model={low_model} (leaderboard={dataset})")
+    else:
+        lines.append(f"  - base_url={low_base_url} model=<set TASKSPINE_LOW_MODEL> (leaderboard={dataset})")
+    if lb_err:
+        lines.append(f"  - leaderboard note: {lb_err} (rows_loaded={lb_rows})")
+    lines.append("- Mid lane (plan/review): OpenAI + latest model id (resolve via /models).")
+    lines.append(f"  - base_url={openai_base} model={mid_model}")
+    lines.append("- High lane (execute): Claude Code via ACP on Opus 4.6 (1M ctx).")
+    lines.append(f"  - delegate_task(acp_command={high_acp_cmd}, acp_args={acp_args})")
+    lines.append("- Rules: benchmark-first for low model; never likes/downloads.")
+
+    return "\n".join(lines)
 
 
 def _score_from_hf_model_index(model_info: Dict[str, Any]) -> Optional[float]:
@@ -469,6 +643,14 @@ def _handle_taskspine_cmd(args) -> None:
 
 
 def register(ctx) -> None:
+    def _pre_llm_call_hook(**_kwargs):
+        # Keep this short; any heavy lifting is cached.
+        try:
+            return {"context": build_taskspine_routing_context()}
+        except Exception as e:
+            return {"context": f"[TASKSPINE ROUTING] (hook error: {e})"}
+
+    ctx.register_hook("pre_llm_call", _pre_llm_call_hook)
     ctx.register_cli_command(
         name="taskspine",
         help="Taskspine utilities (model routing helpers, webhook docs, etc.)",

@@ -26,6 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
 from toolsets import TOOLSETS
+from urllib.parse import urlparse
 
 
 # Tools that children must never have access to
@@ -51,6 +52,22 @@ _TOOLSET_LIST_STR = ", ".join(f"'{n}'" for n in _SUBAGENT_TOOLSETS)
 
 _DEFAULT_MAX_CONCURRENT_CHILDREN = 3
 MAX_DEPTH = 2  # parent (0) -> child (1) -> grandchild rejected (2)
+
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+
+
+def _is_local_base_url(base_url: str | None) -> bool:
+    if not base_url:
+        return False
+    s = str(base_url).strip()
+    if not s:
+        return False
+    try:
+        parsed = urlparse(s if "://" in s else f"http://{s}")
+        host = (parsed.hostname or "").strip().lower()
+        return host in _LOCAL_HOSTS
+    except Exception:
+        return False
 
 
 def _get_max_concurrent_children() -> int:
@@ -626,6 +643,11 @@ def delegate_task(
     toolsets: Optional[List[str]] = None,
     tasks: Optional[List[Dict[str, Any]]] = None,
     max_iterations: Optional[int] = None,
+    model: Optional[str] = None,
+    provider: Optional[str] = None,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    api_mode: Optional[str] = None,
     acp_command: Optional[str] = None,
     acp_args: Optional[List[str]] = None,
     parent_agent=None,
@@ -666,6 +688,16 @@ def delegate_task(
         creds = _resolve_delegation_credentials(cfg, parent_agent)
     except ValueError as exc:
         return tool_error(str(exc))
+
+    # Explicit overrides supplied to this delegate_task call (apply to all tasks
+    # unless overridden per-task).
+    call_override = {
+        "model": (str(model).strip() if isinstance(model, str) and str(model).strip() else None),
+        "provider": (str(provider).strip() if isinstance(provider, str) and str(provider).strip() else None),
+        "base_url": (str(base_url).strip() if isinstance(base_url, str) and str(base_url).strip() else None),
+        "api_key": (str(api_key).strip() if isinstance(api_key, str) and str(api_key).strip() else None),
+        "api_mode": (str(api_mode).strip() if isinstance(api_mode, str) and str(api_mode).strip() else None),
+    }
 
     # Normalize to task list
     max_children = _get_max_concurrent_children()
@@ -711,13 +743,34 @@ def delegate_task(
     children = []
     try:
         for i, t in enumerate(task_list):
+            per_task_override = {
+                "model": (str(t.get("model") or "").strip() or None),
+                "provider": (str(t.get("provider") or "").strip() or None),
+                "base_url": (str(t.get("base_url") or "").strip() or None),
+                "api_key": (str(t.get("api_key") or "").strip() or None),
+                "api_mode": (str(t.get("api_mode") or "").strip() or None),
+            }
+
+            effective_model = per_task_override["model"] or call_override["model"] or creds.get("model")
+            effective_provider = per_task_override["provider"] or call_override["provider"] or creds.get("provider")
+            effective_base_url = per_task_override["base_url"] or call_override["base_url"] or creds.get("base_url")
+            effective_api_key = per_task_override["api_key"] or call_override["api_key"] or creds.get("api_key")
+            effective_api_mode = per_task_override["api_mode"] or call_override["api_mode"] or creds.get("api_mode")
+
+            # Local endpoints (Ollama, LM Studio, etc.) often don't require an API key
+            # but the OpenAI client expects a non-empty string. Provide a harmless
+            # placeholder when none is set.
+            if effective_base_url and not effective_api_key and _is_local_base_url(effective_base_url):
+                effective_api_key = "local"
+
             child = _build_child_agent(
                 task_index=i, goal=t["goal"], context=t.get("context"),
-                toolsets=t.get("toolsets") or toolsets, model=creds["model"],
+                toolsets=t.get("toolsets") or toolsets, model=effective_model,
                 max_iterations=effective_max_iter, parent_agent=parent_agent,
-                override_provider=creds["provider"], override_base_url=creds["base_url"],
-                override_api_key=creds["api_key"],
-                override_api_mode=creds["api_mode"],
+                override_provider=effective_provider,
+                override_base_url=effective_base_url,
+                override_api_key=effective_api_key,
+                override_api_mode=effective_api_mode,
                 override_acp_command=t.get("acp_command") or acp_command,
                 override_acp_args=t.get("acp_args") or acp_args,
             )
@@ -1031,6 +1084,26 @@ DELEGATE_TASK_SCHEMA = {
                             "items": {"type": "string"},
                             "description": f"Toolsets for this specific task. Available: {_TOOLSET_LIST_STR}. Use 'web' for network access, 'terminal' for shell, 'browser' for web interaction.",
                         },
+                        "model": {
+                            "type": "string",
+                            "description": "Per-task model override (highest precedence).",
+                        },
+                        "provider": {
+                            "type": "string",
+                            "description": "Per-task provider override (highest precedence unless base_url is set).",
+                        },
+                        "base_url": {
+                            "type": "string",
+                            "description": "Per-task base_url override (highest precedence).",
+                        },
+                        "api_key": {
+                            "type": "string",
+                            "description": "Per-task api_key override (used with base_url override).",
+                        },
+                        "api_mode": {
+                            "type": "string",
+                            "description": "Per-task api_mode override.",
+                        },
                         "acp_command": {
                             "type": "string",
                             "description": "Per-task ACP command override (e.g. 'claude'). Overrides the top-level acp_command for this task only.",
@@ -1057,6 +1130,40 @@ DELEGATE_TASK_SCHEMA = {
                 "description": (
                     "Max tool-calling turns per subagent (default: 50). "
                     "Only set lower for simple tasks."
+                ),
+            },
+            "model": {
+                "type": "string",
+                "description": (
+                    "Optional model override for all delegated subagents. "
+                    "If unset, uses delegation.model from config, else inherits parent."
+                ),
+            },
+            "provider": {
+                "type": "string",
+                "description": (
+                    "Optional provider override for all delegated subagents (e.g. openai, openrouter, nous). "
+                    "If unset, uses delegation.provider from config, else inherits parent."
+                ),
+            },
+            "base_url": {
+                "type": "string",
+                "description": (
+                    "Optional OpenAI-compatible base URL override for all delegated subagents. "
+                    "Takes precedence over provider when set."
+                ),
+            },
+            "api_key": {
+                "type": "string",
+                "description": (
+                    "Optional API key for base_url override. If omitted, falls back to "
+                    "delegation.api_key or OPENAI_API_KEY; local endpoints can use a dummy value."
+                ),
+            },
+            "api_mode": {
+                "type": "string",
+                "description": (
+                    "Optional API mode override (advanced). If unset, inferred from base_url or inherited."
                 ),
             },
             "acp_command": {
@@ -1095,6 +1202,11 @@ registry.register(
         toolsets=args.get("toolsets"),
         tasks=args.get("tasks"),
         max_iterations=args.get("max_iterations"),
+        model=args.get("model"),
+        provider=args.get("provider"),
+        base_url=args.get("base_url"),
+        api_key=args.get("api_key"),
+        api_mode=args.get("api_mode"),
         acp_command=args.get("acp_command"),
         acp_args=args.get("acp_args"),
         parent_agent=kw.get("parent_agent")),

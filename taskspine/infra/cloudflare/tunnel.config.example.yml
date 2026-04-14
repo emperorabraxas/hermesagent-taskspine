@@ -1,0 +1,24 @@
+# Cloudflare Tunnel example for GitHub webhooks → your box (HTTPS)
+#
+# 1) Create a tunnel:
+#    cloudflared tunnel create hermes-webhooks
+# 2) Point DNS at it (example hostname):
+#    cloudflared tunnel route dns hermes-webhooks hooks.wirelash.dev
+# 3) Run it:
+#    cloudflared tunnel run hermes-webhooks
+#
+# Then set your GitHub webhook URL to:
+#   https://hooks.wirelash.dev/github/webhook
+#
+# And configure Hermes webhook platform to bind that fixed path:
+#   platforms.webhook.extra.path_template: /github/webhook
+#   platforms.webhook.extra.default_route: github
+
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /home/YOUR_USER/.cloudflared/YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: hooks.wirelash.dev
+    service: http://127.0.0.1:8644
+  - service: http_status:404
+

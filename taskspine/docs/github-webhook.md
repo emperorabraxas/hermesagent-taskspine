@@ -25,8 +25,8 @@ platforms:
   webhook:
     enabled: true
     extra:
-      host: 0.0.0.0
-      port: 8644
+      host: 127.0.0.1
+      port: 8787
       # Optional: make the endpoint exactly /github/webhook (single route).
       path_template: /github/webhook
       default_route: github
@@ -58,7 +58,7 @@ If you want the webhook to terminate on **your machine** (this box), run the gat
 
 2) Expose HTTPS → local HTTP:
 
-- Point the tunnel to `http://127.0.0.1:8644` (or whatever you set as `platforms.webhook.extra.port`)
+- Point the tunnel to `http://127.0.0.1:8787` (or whatever you set as `platforms.webhook.extra.port`)
 - Set your GitHub webhook URL to the public hostname + your chosen path:
   - fixed path mode: `https://YOUR_HOSTNAME/github/webhook`
   - route path mode: `https://YOUR_HOSTNAME/webhooks/github`

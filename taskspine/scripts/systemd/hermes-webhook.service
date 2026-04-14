@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=%h/hermesagent-taskspine
 Environment=HERMES_ENABLE_PROJECT_PLUGINS=1
+Environment=TASKSPINE_WEBHOOK_PUBLIC_URL=https://hooks.wirelash.dev/github/webhook
 ExecStart=%h/hermesagent-taskspine/hermes gateway run --replace
 Restart=on-failure
 RestartSec=2

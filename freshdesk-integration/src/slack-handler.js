@@ -161,29 +161,35 @@ function tryInjectCurrentSession(prompt, userName, channelName) {
 }
 
 function trySpawnTerminal(prompt, userName) {
+  // Write prompt to temp file to avoid shell escaping issues
+  const tmpFile = `/tmp/claude-prompt-${Date.now()}.md`;
+  writeFileSync(tmpFile, prompt);
+
   const terminals = ['kitty', 'alacritty', 'wezterm', 'gnome-terminal', 'konsole', 'xterm'];
 
   for (const term of terminals) {
     try {
       let args;
+      const claudeCmd = `claude -p "$(cat ${tmpFile})"`;
+
       switch (term) {
         case 'kitty':
-          args = ['--title', `Slack: ${userName}`, 'claude', '-p', prompt];
+          args = ['--title', `Slack: ${userName}`, 'bash', '-c', claudeCmd];
           break;
         case 'alacritty':
-          args = ['--title', `Slack: ${userName}`, '-e', 'claude', '-p', prompt];
+          args = ['--title', `Slack: ${userName}`, '-e', 'bash', '-c', claudeCmd];
           break;
         case 'wezterm':
-          args = ['start', '--', 'claude', '-p', prompt];
+          args = ['start', '--', 'bash', '-c', claudeCmd];
           break;
         case 'gnome-terminal':
-          args = ['--title', `Slack: ${userName}`, '--', 'claude', '-p', prompt];
+          args = ['--title', `Slack: ${userName}`, '--', 'bash', '-c', claudeCmd];
           break;
         case 'konsole':
-          args = ['-e', 'claude', '-p', prompt];
+          args = ['-e', 'bash', '-c', claudeCmd];
           break;
         case 'xterm':
-          args = ['-title', `Slack: ${userName}`, '-e', 'claude', '-p', prompt];
+          args = ['-title', `Slack: ${userName}`, '-e', 'bash', '-c', claudeCmd];
           break;
       }
 

@@ -228,7 +228,7 @@ claude -p "$(cat ${promptFile})"
   execSync(`chmod +x ${scriptFile}`);
 
   try {
-    spawn('kitty', ['--title', `Support: ${userName}`, scriptFile], {
+    spawn('kitty', ['--hold', '--title', `Support: ${userName}`, 'bash', scriptFile], {
       detached: true,
       stdio: 'ignore'
     }).unref();

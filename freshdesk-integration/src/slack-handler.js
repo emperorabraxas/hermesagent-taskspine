@@ -219,37 +219,30 @@ function spawnTerminal(event, userName, reason = '') {
 
   writeFileSync(promptFile, prompt);
 
-  // Use kitty remote control to send text
-  const socketPath = `/tmp/kitty-support-${Date.now()}`;
-  const scriptFile = `/tmp/claude-run-${Date.now()}.sh`;
-  writeFileSync(scriptFile, `#!/bin/bash
-cd ~/hermesagent-taskspine
-exec claude
-`);
-  execSync(`chmod +x ${scriptFile}`);
+  // Use tmux to send text reliably
+  const sessionName = `support-${Date.now()}`;
+  const prompt = readFileSync(promptFile, 'utf8');
 
   try {
-    // Start kitty with remote control enabled
-    const kittyProc = spawn('kitty', [
-      '--listen-on', `unix:${socketPath}`,
-      '--title', `Support: ${userName}`,
-      'bash', scriptFile
-    ], {
-      detached: true,
-      stdio: 'ignore'
-    });
-    kittyProc.unref();
+    // Create tmux session running claude
+    execSync(`tmux new-session -d -s ${sessionName} -c ~/hermesagent-taskspine 'claude'`);
 
-    // Wait for kitty and claude to start, then send text
+    // Wait for claude to start
     setTimeout(() => {
       try {
-        const prompt = readFileSync(promptFile, 'utf8').replace(/'/g, "'\\''");
-        execSync(`kitty @ --to unix:${socketPath} send-text '${prompt}\n'`, { stdio: 'ignore' });
+        // Send the prompt text
+        execSync(`tmux send-keys -t ${sessionName} ${JSON.stringify(prompt)} Enter`);
         console.log(chalk.green(`  ✓ Prompt sent to Claude`));
       } catch (e) {
         console.log(chalk.yellow(`  ⚠ Could not send text: ${e.message}`));
       }
     }, 3000);
+
+    // Open kitty attached to the tmux session
+    spawn('kitty', ['--title', `Support: ${userName}`, 'tmux', 'attach', '-t', sessionName], {
+      detached: true,
+      stdio: 'ignore'
+    }).unref();
 
     console.log(chalk.green(`  ✓ Terminal spawned`));
   } catch (e) {

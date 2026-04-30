@@ -81,8 +81,10 @@ async function handleMessage(event, isMention = false) {
   const analysis = await analyzeWithClaude(event.text || '', userName);
 
   if (analysis.needsTerminal) {
-    console.log(chalk.cyan(`  → Code issue detected, attempting auto-solve...`));
-    await tryAutoSolve(event, userName);
+    console.log(chalk.cyan(`  → Needs investigation, escalating...`));
+    await replyToSlack(event, `Hey ${userName}! I'm escalating this to the team — someone will follow up shortly.`);
+    spawnTerminal(event, userName, analysis.questions || 'Needs investigation');
+    try { execSync(`notify-send -u critical "Support escalated" "${event.text?.slice(0, 50)}..."`); } catch {}
   } else {
     console.log(chalk.cyan(`  → Auto-replying...`));
     await replyToSlack(event, analysis.response);
@@ -102,7 +104,12 @@ Instructions:
 3. Keep responses concise and friendly
 
 Respond in this exact JSON format only, no other text:
-{"needsTerminal": true/false, "response": "your response here"}`;
+
+If you can FULLY answer/solve without needing any more information:
+{"needsTerminal": false, "response": "Your complete solution/answer"}
+
+If you need ANY additional info, clarification, or aren't 100% sure:
+{"needsTerminal": true, "response": "I'm escalating this to the team.", "questions": "What you need to investigate"}`;
 
   try {
     const tmpFile = `/tmp/claude-analyze-${Date.now()}.txt`;

@@ -111,58 +111,112 @@ function generatePlan(text) {
   return ['Analyze request', 'Determine action needed', 'Draft response'];
 }
 
+import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { execSync } from 'child_process';
+
 function spawnClaudeSession(event, prompt, userName, channelName) {
-  console.log(chalk.cyan(`  → Spawning Claude Code session...`));
+  console.log(chalk.cyan(`  → Delivering to Claude Code...`));
 
+  // PRIORITY 1: Inject into current session via queue file + notification
+  const injected = tryInjectCurrentSession(prompt, userName, channelName);
+  if (injected) return;
+
+  // PRIORITY 2: Spawn new terminal window
+  const spawned = trySpawnTerminal(prompt, userName);
+  if (spawned) return;
+
+  // PRIORITY 3: Open Claude Code web
+  tryOpenWeb(prompt, userName);
+}
+
+function tryInjectCurrentSession(prompt, userName, channelName) {
   try {
-    const terminals = ['kitty', 'alacritty', 'wezterm', 'gnome-terminal', 'xterm'];
-    let spawned = false;
+    const queueFile = process.env.CLAUDE_SESSION_FILE || '/tmp/claude-ticket-queue.json';
 
-    for (const term of terminals) {
-      try {
-        if (term === 'kitty') {
-          spawn('kitty', ['--title', `Slack: ${userName}`, 'claude', '-p', prompt], {
-            detached: true,
-            stdio: 'ignore'
-          }).unref();
-          spawned = true;
-        } else if (term === 'gnome-terminal') {
-          spawn('gnome-terminal', ['--title', `Slack: ${userName}`, '--', 'claude', '-p', prompt], {
-            detached: true,
-            stdio: 'ignore'
-          }).unref();
-          spawned = true;
-        } else if (term === 'alacritty') {
-          spawn('alacritty', ['--title', `Slack: ${userName}`, '-e', 'claude', '-p', prompt], {
-            detached: true,
-            stdio: 'ignore'
-          }).unref();
-          spawned = true;
-        } else if (term === 'wezterm') {
-          spawn('wezterm', ['start', '--', 'claude', '-p', prompt], {
-            detached: true,
-            stdio: 'ignore'
-          }).unref();
-          spawned = true;
-        }
-        if (spawned) {
-          console.log(chalk.green(`  ✓ Claude session spawned (${term})`));
+    let queue = [];
+    if (existsSync(queueFile)) {
+      try { queue = JSON.parse(readFileSync(queueFile, 'utf8')); } catch {}
+    }
+
+    queue.push({
+      type: 'slack',
+      from: userName,
+      channel: channelName,
+      prompt,
+      queuedAt: new Date().toISOString()
+    });
+
+    writeFileSync(queueFile, JSON.stringify(queue, null, 2));
+
+    // Send desktop notification
+    try {
+      execSync(`notify-send -u critical "Support Request" "From ${userName} in #${channelName}" 2>/dev/null`);
+    } catch {}
+
+    console.log(chalk.green(`  ✓ Queued for current session + notified`));
+    return true;
+  } catch (e) {
+    console.log(chalk.yellow(`  ⚠ Could not queue: ${e.message}`));
+    return false;
+  }
+}
+
+function trySpawnTerminal(prompt, userName) {
+  const terminals = ['kitty', 'alacritty', 'wezterm', 'gnome-terminal', 'konsole', 'xterm'];
+
+  for (const term of terminals) {
+    try {
+      let args;
+      switch (term) {
+        case 'kitty':
+          args = ['--title', `Slack: ${userName}`, 'claude', '-p', prompt];
           break;
-        }
+        case 'alacritty':
+          args = ['--title', `Slack: ${userName}`, '-e', 'claude', '-p', prompt];
+          break;
+        case 'wezterm':
+          args = ['start', '--', 'claude', '-p', prompt];
+          break;
+        case 'gnome-terminal':
+          args = ['--title', `Slack: ${userName}`, '--', 'claude', '-p', prompt];
+          break;
+        case 'konsole':
+          args = ['-e', 'claude', '-p', prompt];
+          break;
+        case 'xterm':
+          args = ['-title', `Slack: ${userName}`, '-e', 'claude', '-p', prompt];
+          break;
+      }
+
+      spawn(term, args, { detached: true, stdio: 'ignore' }).unref();
+      console.log(chalk.green(`  ✓ New terminal spawned (${term})`));
+      return true;
+    } catch {}
+  }
+
+  return false;
+}
+
+function tryOpenWeb(prompt, userName) {
+  try {
+    // Write prompt to temp file for reference
+    const tmpFile = `/tmp/claude-slack-${Date.now()}.md`;
+    writeFileSync(tmpFile, prompt);
+
+    // Open Claude Code web
+    const browsers = ['xdg-open', 'firefox', 'chromium', 'google-chrome'];
+    for (const browser of browsers) {
+      try {
+        spawn(browser, ['https://claude.ai/code'], { detached: true, stdio: 'ignore' }).unref();
+        console.log(chalk.green(`  ✓ Opened Claude Code web`));
+        console.log(chalk.gray(`    Prompt saved to: ${tmpFile}`));
+        return true;
       } catch {}
     }
-
-    if (!spawned) {
-      // Fallback: run claude directly
-      spawn('claude', ['-p', prompt], {
-        detached: true,
-        stdio: 'ignore'
-      }).unref();
-      console.log(chalk.green(`  ✓ Claude session spawned`));
-    }
-  } catch (error) {
-    console.error(chalk.red(`  ✗ Failed to spawn: ${error.message}`));
+  } catch (e) {
+    console.error(chalk.red(`  ✗ All methods failed: ${e.message}`));
   }
+  return false;
 }
 
 (async () => {

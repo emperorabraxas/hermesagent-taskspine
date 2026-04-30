@@ -219,40 +219,38 @@ function spawnTerminal(event, userName, reason = '') {
 
   writeFileSync(promptFile, prompt);
 
-  // Start claude, wait for it to load, then auto-type the prompt
+  // Use kitty remote control to send text
+  const socketPath = `/tmp/kitty-support-${Date.now()}`;
   const scriptFile = `/tmp/claude-run-${Date.now()}.sh`;
   writeFileSync(scriptFile, `#!/bin/bash
 cd ~/hermesagent-taskspine
-
-# Start claude in background
-claude &
-CLAUDE_PID=$!
-
-# Wait for claude to initialize
-sleep 3
-
-# Try ydotool first (Wayland), fallback to wtype, then xdotool
-if command -v ydotool &> /dev/null; then
-  ydotool type "$(cat ${promptFile})"
-  ydotool key 28:1 28:0  # Enter key
-elif command -v wtype &> /dev/null; then
-  wtype -d 5 "$(cat ${promptFile})"
-  wtype -k Return
-elif command -v xdotool &> /dev/null; then
-  xdotool type --delay 5 "$(cat ${promptFile})"
-  xdotool key Return
-fi
-
-# Wait for claude
-wait $CLAUDE_PID
+exec claude
 `);
   execSync(`chmod +x ${scriptFile}`);
 
   try {
-    spawn('kitty', ['--hold', '--title', `Support: ${userName}`, 'bash', scriptFile], {
+    // Start kitty with remote control enabled
+    const kittyProc = spawn('kitty', [
+      '--listen-on', `unix:${socketPath}`,
+      '--title', `Support: ${userName}`,
+      'bash', scriptFile
+    ], {
       detached: true,
       stdio: 'ignore'
-    }).unref();
+    });
+    kittyProc.unref();
+
+    // Wait for kitty and claude to start, then send text
+    setTimeout(() => {
+      try {
+        const prompt = readFileSync(promptFile, 'utf8').replace(/'/g, "'\\''");
+        execSync(`kitty @ --to unix:${socketPath} send-text '${prompt}\n'`, { stdio: 'ignore' });
+        console.log(chalk.green(`  ✓ Prompt sent to Claude`));
+      } catch (e) {
+        console.log(chalk.yellow(`  ⚠ Could not send text: ${e.message}`));
+      }
+    }, 3000);
+
     console.log(chalk.green(`  ✓ Terminal spawned`));
   } catch (e) {
     console.log(chalk.yellow(`  ⚠ Terminal failed: ${e.message}`));

@@ -160,14 +160,11 @@ function tryAutoSolve(event, userName) {
 2. Try to fix it if you can identify the issue
 3. When done, respond with ONLY this JSON (no other text):
 
-If you solved it or can answer directly:
-{"solved": true, "response": "Your response to send to Slack", "needsHuman": false}
+If you solved it completely:
+{"solved": true, "response": "Your solution to send to Slack"}
 
-If you need more info from the user:
-{"solved": false, "response": "Your follow-up questions", "needsHuman": false}
-
-If you need human developer help:
-{"solved": false, "response": "Brief status to tell user", "needsHuman": true, "reason": "why you need help"}`;
+If you need ANY additional info, have questions, or need human help:
+{"solved": false, "questions": "What you need to know to solve this"}`;
 
   const tmpFile = `/tmp/claude-prompt-${Date.now()}.md`;
   writeFileSync(tmpFile, prompt);
@@ -192,15 +189,15 @@ If you need human developer help:
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
 
-        if (result.needsHuman) {
-          console.log(chalk.yellow(`  → Needs human: ${result.reason}`));
-          await replyToSlack(event, result.response || `Hey ${userName}! Looking into this — will follow up shortly.`);
-          spawnTerminal(event, userName, result.reason);
-          // Desktop notification
-          try { execSync(`notify-send -u critical "Support needs you" "${result.reason}"`); } catch {}
-        } else {
-          console.log(chalk.green(`  ✓ Auto-resolved, sending to Slack`));
+        if (result.solved) {
+          console.log(chalk.green(`  ✓ Solved, auto-replying`));
           await replyToSlack(event, result.response);
+        } else {
+          // Not solved - escalate to human, don't ask submitter
+          console.log(chalk.yellow(`  → Escalating to human`));
+          await replyToSlack(event, `Hey ${userName}! I'm escalating this to the team — someone will follow up shortly.`);
+          spawnTerminal(event, userName, result.questions || 'Needs investigation');
+          try { execSync(`notify-send -u critical "Support escalated" "${event.text?.slice(0, 50)}..."`); } catch {}
         }
         return;
       }
@@ -208,11 +205,11 @@ If you need human developer help:
       console.log(chalk.yellow(`  ⚠ Parse failed: ${e.message}`));
     }
 
-    // Fallback
-    console.log(chalk.yellow(`  → Couldn't parse response, opening terminal`));
-    await replyToSlack(event, `Hey ${userName}! Looking into this.`);
+    // Fallback - escalate
+    console.log(chalk.yellow(`  → Escalating (couldn't parse)`));
+    await replyToSlack(event, `Hey ${userName}! I'm escalating this to the team — someone will follow up shortly.`);
     spawnTerminal(event, userName, 'Auto-solve unclear');
-    try { execSync(`notify-send -u critical "Support needs you" "Auto-solve unclear"`); } catch {}
+    try { execSync(`notify-send -u critical "Support escalated" "${event.text?.slice(0, 50)}..."`); } catch {}
   });
 }
 

@@ -65,11 +65,11 @@ async function handleMessage(event, isMention = false) {
   console.log(chalk.yellow(`\n🎫 Support request from ${userName}`));
   console.log(chalk.gray(`   "${event.text?.slice(0, 80)}${event.text?.length > 80 ? '...' : ''}"`));
 
-  // Determine complexity
-  const isComplex = needsHumanReview(event.text || '');
+  // Check if it's a code issue that needs terminal
+  const codeIssue = needsTerminal(event.text || '');
 
-  if (isComplex) {
-    console.log(chalk.cyan(`  → Complex issue, spawning terminal...`));
+  if (codeIssue) {
+    console.log(chalk.cyan(`  → Code issue, spawning terminal...`));
     await replyToSlack(event, `Hey ${userName}! Looking into this now — I'll get back to you shortly.`);
     spawnTerminal(event, userName);
   } else {
@@ -79,14 +79,16 @@ async function handleMessage(event, isMention = false) {
   }
 }
 
-function needsHumanReview(text) {
+function needsTerminal(text) {
   const lower = text.toLowerCase();
-  const complexIndicators = [
-    'code', 'deploy', 'production', 'database', 'server', 'api',
-    'urgent', 'asap', 'critical', 'down', 'outage', 'security',
-    'refund', 'billing', 'account', 'delete', 'cancel'
+  // Only open terminal for issues Claude Code can actually solve
+  const codeIssues = [
+    'code', 'bug', 'deploy', 'api', 'server', 'database', 'function',
+    'script', 'error log', 'stack trace', 'exception', 'crash',
+    'build', 'compile', 'git', 'repo', 'branch', 'merge', 'commit',
+    'test', 'failing test', 'ci', 'pipeline', 'docker', 'container'
   ];
-  return complexIndicators.some(kw => lower.includes(kw));
+  return codeIssues.some(kw => lower.includes(kw));
 }
 
 async function generateResponse(message, userName) {

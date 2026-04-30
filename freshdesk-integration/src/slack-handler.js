@@ -219,11 +219,23 @@ function spawnTerminal(event, userName, reason = '') {
 
   writeFileSync(promptFile, prompt);
 
-  // Use script to avoid all shell escaping - reads prompt from file
+  // Start interactive claude - show context first, then open claude
   const scriptFile = `/tmp/claude-run-${Date.now()}.sh`;
   writeFileSync(scriptFile, `#!/bin/bash
 cd ~/hermesagent-taskspine
-claude -p "$(cat ${promptFile})"
+
+echo "╔════════════════════════════════════════════╗"
+echo "║  ESCALATED SUPPORT REQUEST                 ║"
+echo "╚════════════════════════════════════════════╝"
+echo ""
+cat ${promptFile}
+echo ""
+echo "════════════════════════════════════════════"
+echo "Paste the above into Claude or type your own query."
+echo "════════════════════════════════════════════"
+echo ""
+
+exec claude
 `);
   execSync(`chmod +x ${scriptFile}`);
 

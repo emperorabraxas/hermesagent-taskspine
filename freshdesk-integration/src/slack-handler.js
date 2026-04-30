@@ -214,16 +214,21 @@ If you need ANY additional info, have questions, or need human help:
 }
 
 function spawnTerminal(event, userName, reason = '') {
-  // Clean the message - remove special chars that break shell
-  const cleanMsg = (event.text || '').replace(/["`$\\]/g, '').slice(0, 200);
-  const cleanReason = (reason || '').replace(/["`$\\]/g, '').slice(0, 200);
+  const promptFile = `/tmp/claude-support-${Date.now()}.txt`;
+  const prompt = `Escalated support request from ${userName}: ${event.text || 'No message'}\n\nReason escalated: ${reason || 'Unknown'}\n\nInvestigate and fix this issue.`;
 
-  const prompt = `Escalated support request from ${userName}: ${cleanMsg} | Reason: ${cleanReason} | Investigate and fix this issue.`;
+  writeFileSync(promptFile, prompt);
 
-  const cmd = `cd ~/hermesagent-taskspine && claude -p "${prompt}"`;
+  // Use script to avoid all shell escaping - reads prompt from file
+  const scriptFile = `/tmp/claude-run-${Date.now()}.sh`;
+  writeFileSync(scriptFile, `#!/bin/bash
+cd ~/hermesagent-taskspine
+claude -p "$(cat ${promptFile})"
+`);
+  execSync(`chmod +x ${scriptFile}`);
 
   try {
-    spawn('kitty', ['--title', `Support: ${userName}`, 'bash', '-c', cmd], {
+    spawn('kitty', ['--title', `Support: ${userName}`, scriptFile], {
       detached: true,
       stdio: 'ignore'
     }).unref();

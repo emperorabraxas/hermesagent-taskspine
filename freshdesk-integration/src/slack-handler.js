@@ -214,25 +214,16 @@ If you need ANY additional info, have questions, or need human help:
 }
 
 function spawnTerminal(event, userName, reason = '') {
-  const context = `## Escalated Support Request
+  // Clean the message - remove special chars that break shell
+  const cleanMsg = (event.text || '').replace(/["`$\\]/g, '').slice(0, 200);
+  const cleanReason = (reason || '').replace(/["`$\\]/g, '').slice(0, 200);
 
-From: ${userName}
-Message: ${event.text}
+  const prompt = `Escalated support request from ${userName}: ${cleanMsg} | Reason: ${cleanReason} | Investigate and fix this issue.`;
 
-Reason: ${reason}
-
----
-Investigate and fix. Reply in Slack when done.`;
-
-  // Write to file to avoid escaping issues
-  const contextFile = `/tmp/support-${Date.now()}.txt`;
-  writeFileSync(contextFile, context);
-
-  // Simple command - show context then run claude
-  const cmd = `cat ${contextFile}; echo ""; echo "---"; cd ~/hermesagent-taskspine && claude`;
+  const cmd = `cd ~/hermesagent-taskspine && claude -p "${prompt}"`;
 
   try {
-    spawn('kitty', ['--hold', '--title', `Support: ${userName}`, 'bash', '-c', cmd], {
+    spawn('kitty', ['--title', `Support: ${userName}`, 'bash', '-c', cmd], {
       detached: true,
       stdio: 'ignore'
     }).unref();

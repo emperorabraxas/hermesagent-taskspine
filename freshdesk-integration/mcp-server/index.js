@@ -122,6 +122,42 @@ const tools = {
       const tickets = await client.getNewOrUpdatedTickets(params.minutes || 30);
       return tickets.map(t => client.formatTicketForClaude(t));
     }
+  },
+
+  check_ticket_queue: {
+    description: 'Check for tickets queued by the auto-handler for this session',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        clear: { type: 'boolean', description: 'Clear queue after reading (default true)' }
+      }
+    },
+    handler: async (params) => {
+      const fs = await import('fs');
+      const queueFile = process.env.CLAUDE_SESSION_FILE || '/tmp/claude-ticket-queue.json';
+
+      if (!fs.existsSync(queueFile)) {
+        return { tickets: [], message: 'No tickets in queue' };
+      }
+
+      try {
+        const queue = JSON.parse(fs.readFileSync(queueFile, 'utf8'));
+
+        if (params.clear !== false && queue.length > 0) {
+          fs.writeFileSync(queueFile, '[]');
+        }
+
+        return {
+          tickets: queue,
+          count: queue.length,
+          message: queue.length > 0
+            ? `${queue.length} ticket(s) ready for review`
+            : 'No tickets in queue'
+        };
+      } catch (e) {
+        return { tickets: [], error: e.message };
+      }
+    }
   }
 };
 

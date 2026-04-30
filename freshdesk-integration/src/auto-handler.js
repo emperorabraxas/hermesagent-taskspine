@@ -180,38 +180,101 @@ async function postToSlack(ticket, plan, isNew) {
 }
 
 function spawnClaudeSession(ticket, prompt) {
-  console.log(chalk.cyan(`  → Spawning Claude Code session for ticket #${ticket.id}...`));
+  console.log(chalk.cyan(`  → Delivering ticket #${ticket.id} to Claude Code...`));
 
+  const fs = require('fs');
+  const tmpFile = `/tmp/claude-ticket-${ticket.id}.md`;
+  fs.writeFileSync(tmpFile, prompt);
+
+  // PRIORITY 1: Inject into current terminal session via MCP queue file
+  // The MCP server reads this and surfaces it when polled
+  const queueFile = process.env.CLAUDE_SESSION_FILE || '/tmp/claude-ticket-queue.json';
   try {
-    // Write prompt to temp file to avoid shell escaping issues
-    const tmpFile = `/tmp/claude-ticket-${ticket.id}.md`;
-    require('fs').writeFileSync(tmpFile, prompt);
+    let queue = [];
+    if (fs.existsSync(queueFile)) {
+      queue = JSON.parse(fs.readFileSync(queueFile, 'utf8'));
+    }
+    queue.push({
+      ticketId: ticket.id,
+      prompt,
+      link: `https://${process.env.FRESHDESK_DOMAIN}/a/tickets/${ticket.id}`,
+      queuedAt: new Date().toISOString()
+    });
+    fs.writeFileSync(queueFile, JSON.stringify(queue, null, 2));
+    console.log(chalk.green(`  ✓ Queued for current session (MCP will pick it up)`));
+  } catch (e) {
+    console.log(chalk.yellow(`  ⚠ Could not queue for current session: ${e.message}`));
+  }
 
-    // Spawn claude in a new terminal
-    const terminal = process.env.TERMINAL || 'kitty';
+  // PRIORITY 2: Spawn new Claude Code terminal session
+  try {
+    const terminal = process.env.TERMINAL || detectTerminal();
+    let spawned = false;
 
     if (terminal === 'kitty') {
       spawn('kitty', ['--title', `Ticket #${ticket.id}`, 'claude', '-p', prompt], {
         detached: true,
         stdio: 'ignore'
       }).unref();
+      spawned = true;
     } else if (terminal === 'gnome-terminal') {
-      spawn('gnome-terminal', ['--', 'claude', '-p', prompt], {
+      spawn('gnome-terminal', ['--title', `Ticket #${ticket.id}`, '--', 'claude', '-p', prompt], {
         detached: true,
         stdio: 'ignore'
       }).unref();
-    } else {
-      // Fallback: just run claude in background
-      spawn('claude', ['--print', '-p', prompt], {
+      spawned = true;
+    } else if (terminal === 'alacritty') {
+      spawn('alacritty', ['--title', `Ticket #${ticket.id}`, '-e', 'claude', '-p', prompt], {
         detached: true,
         stdio: 'ignore'
       }).unref();
+      spawned = true;
+    } else if (terminal === 'wezterm') {
+      spawn('wezterm', ['start', '--', 'claude', '-p', prompt], {
+        detached: true,
+        stdio: 'ignore'
+      }).unref();
+      spawned = true;
+    } else if (terminal === 'xterm') {
+      spawn('xterm', ['-title', `Ticket #${ticket.id}`, '-e', 'claude', '-p', prompt], {
+        detached: true,
+        stdio: 'ignore'
+      }).unref();
+      spawned = true;
     }
 
-    console.log(chalk.green(`  ✓ Claude session spawned`));
+    if (spawned) {
+      console.log(chalk.green(`  ✓ New terminal session spawned (${terminal})`));
+      return;
+    }
   } catch (error) {
-    console.error(chalk.red(`  ✗ Failed to spawn Claude: ${error.message}`));
+    console.log(chalk.yellow(`  ⚠ Terminal spawn failed: ${error.message}`));
   }
+
+  // PRIORITY 3: Fallback to headless claude (outputs to console)
+  try {
+    const result = spawn('claude', ['--print', '-p', prompt], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    result.unref();
+    console.log(chalk.green(`  ✓ Headless Claude session started`));
+  } catch (error) {
+    console.error(chalk.red(`  ✗ All methods failed. Ticket saved to: ${tmpFile}`));
+  }
+}
+
+function detectTerminal() {
+  const { execSync } = require('child_process');
+  const terminals = ['kitty', 'alacritty', 'wezterm', 'gnome-terminal', 'xterm'];
+
+  for (const term of terminals) {
+    try {
+      execSync(`which ${term}`, { stdio: 'ignore' });
+      return term;
+    } catch {}
+  }
+  return 'xterm';
 }
 
 main();

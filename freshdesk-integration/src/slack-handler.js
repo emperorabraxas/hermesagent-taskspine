@@ -170,7 +170,7 @@ function trySpawnTerminal(prompt, userName) {
   for (const term of terminals) {
     try {
       let args;
-      const claudeCmd = `claude -p "$(cat ${tmpFile})"`;
+      const claudeCmd = `claude -p "$(cat ${tmpFile})" || (echo "Claude crashed. Press enter to close." && read)`;
 
       switch (term) {
         case 'kitty':

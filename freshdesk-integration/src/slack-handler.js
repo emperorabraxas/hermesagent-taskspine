@@ -2,8 +2,7 @@
 import 'dotenv/config';
 import { WebClient } from '@slack/web-api';
 import { SocketModeClient } from '@slack/socket-mode';
-import { spawn, execSync } from 'child_process';
-import { writeFileSync } from 'fs';
+import { spawn, execSync, spawnSync } from 'child_process';
 import axios from 'axios';
 import chalk from 'chalk';
 
@@ -132,13 +131,10 @@ If there is ANY uncertainty or missing info:
 {"needsTerminal": true, "questions": "What specifically needs investigation"}`;
 
   try {
-    const tmpFile = `/tmp/claude-analyze-${Date.now()}.txt`;
-    writeFileSync(tmpFile, prompt);
-
-    const result = execSync(`claude --print -p "$(cat ${tmpFile})" 2>/dev/null`, {
+    const result = spawnSync('claude', ['-p', prompt], {
       encoding: 'utf8',
       timeout: 30000
-    }).trim();
+    }).stdout?.trim() || '';
 
     const jsonMatch = result.match(/\{[\s\S]*\}/);
     if (jsonMatch) {

@@ -219,23 +219,24 @@ function spawnTerminal(event, userName, reason = '') {
 
   writeFileSync(promptFile, prompt);
 
-  // Start interactive claude - show context first, then open claude
+  // Start claude, wait for it to load, then auto-type the prompt
   const scriptFile = `/tmp/claude-run-${Date.now()}.sh`;
   writeFileSync(scriptFile, `#!/bin/bash
 cd ~/hermesagent-taskspine
 
-echo "╔════════════════════════════════════════════╗"
-echo "║  ESCALATED SUPPORT REQUEST                 ║"
-echo "╚════════════════════════════════════════════╝"
-echo ""
-cat ${promptFile}
-echo ""
-echo "════════════════════════════════════════════"
-echo "Paste the above into Claude or type your own query."
-echo "════════════════════════════════════════════"
-echo ""
+# Start claude in background
+claude &
+CLAUDE_PID=$!
 
-exec claude
+# Wait for claude to initialize
+sleep 2
+
+# Type the prompt using xdotool
+xdotool type --delay 5 "$(cat ${promptFile})"
+xdotool key Return
+
+# Wait for claude to finish
+wait $CLAUDE_PID
 `);
   execSync(`chmod +x ${scriptFile}`);
 

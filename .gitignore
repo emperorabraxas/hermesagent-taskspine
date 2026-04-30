@@ -13,6 +13,8 @@
 !test/
 !spider.Web/
 !spider.Web/**
+!freshdesk-integration/
+!freshdesk-integration/**
 !salesforce-backup/
 !salesforce-backup/README.md
 !salesforce-backup/sfdx-project.json

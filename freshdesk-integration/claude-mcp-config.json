@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "freshdesk": {
+      "command": "node",
+      "args": ["mcp-server/index.js"],
+      "cwd": "/home/user/hermesagent-taskspine/freshdesk-integration",
+      "env": {
+        "FRESHDESK_DOMAIN": "${FRESHDESK_DOMAIN}",
+        "FRESHDESK_API_KEY": "${FRESHDESK_API_KEY}"
+      }
+    }
+  }
+}

@@ -81,9 +81,8 @@ async function handleMessage(event, isMention = false) {
   const analysis = await analyzeWithClaude(event.text || '', userName);
 
   if (analysis.needsTerminal) {
-    console.log(chalk.cyan(`  → Code issue detected, spawning terminal...`));
-    await replyToSlack(event, `Hey ${userName}! Looking into this now — I'll get back to you shortly.`);
-    spawnTerminal(event, userName);
+    console.log(chalk.cyan(`  → Code issue detected, attempting auto-solve...`));
+    await tryAutoSolve(event, userName);
   } else {
     console.log(chalk.cyan(`  → Auto-replying...`));
     await replyToSlack(event, analysis.response);
@@ -147,28 +146,92 @@ async function replyToSlack(event, text) {
   }
 }
 
-function spawnTerminal(event, userName) {
-  const prompt = `## Slack Support — Code Issue
+async function tryAutoSolve(event, userName) {
+  const responseFile = `/tmp/claude-response-${Date.now()}.json`;
 
+  const prompt = `${SYSTEM_CONTEXT}
+
+## Support Request
 **From:** ${userName}
 **Message:** ${event.text}
 
-${SYSTEM_CONTEXT}
+## Instructions
+1. Investigate this issue - check the codebase, look for relevant files, understand the problem
+2. Try to fix it if you can identify the issue
+3. When done, respond with ONLY this JSON (no other text):
 
-Analyze this issue and help me fix it. After we solve it, draft a response to send back.`;
+If you solved it or can answer directly:
+{"solved": true, "response": "Your response to send to Slack", "needsHuman": false}
+
+If you need more info from the user:
+{"solved": false, "response": "Your follow-up questions", "needsHuman": false}
+
+If you need human developer help:
+{"solved": false, "response": "Brief status to tell user", "needsHuman": true, "reason": "why you need help"}
+
+Output the JSON to: ${responseFile}`;
 
   const tmpFile = `/tmp/claude-prompt-${Date.now()}.md`;
   writeFileSync(tmpFile, prompt);
 
-  // Interactive session - show errors if it fails
-  const claudeCmd = `cat ${tmpFile} && echo "---" && claude -p "$(cat ${tmpFile})" || (echo "ERROR: Claude exited with code $?"; read -p "Press enter to close...")`;
+  console.log(chalk.cyan(`  → Claude investigating...`));
 
   try {
-    spawn('kitty', ['--hold', '--title', `Support: ${userName}`, 'bash', '-c', claudeCmd], {
+    // Run claude with --print to get response, working from repo root
+    execSync(`cd ~/hermesagent-taskspine && claude --print -p "$(cat ${tmpFile})" > ${responseFile} 2>&1`, {
+      timeout: 120000,
+      encoding: 'utf8'
+    });
+
+    // Read and parse response
+    const output = readFileSync(responseFile, 'utf8');
+    const jsonMatch = output.match(/\{[\s\S]*"solved"[\s\S]*\}/);
+
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+
+      if (result.needsHuman) {
+        console.log(chalk.yellow(`  → Needs human help: ${result.reason}`));
+        await replyToSlack(event, result.response || `Hey ${userName}! Looking into this — someone will follow up shortly.`);
+        spawnTerminal(event, userName, result.reason);
+      } else {
+        console.log(chalk.green(`  ✓ Auto-resolved`));
+        await replyToSlack(event, result.response);
+      }
+      return;
+    }
+  } catch (e) {
+    console.log(chalk.yellow(`  ⚠ Auto-solve failed: ${e.message}`));
+  }
+
+  // Fallback - open terminal
+  console.log(chalk.yellow(`  → Falling back to terminal`));
+  await replyToSlack(event, `Hey ${userName}! Looking into this now.`);
+  spawnTerminal(event, userName, 'Auto-solve failed');
+}
+
+function spawnTerminal(event, userName, reason = '') {
+  const prompt = `## Slack Support — Needs Human Help
+
+**From:** ${userName}
+**Message:** ${event.text}
+**Reason escalated:** ${reason}
+
+${SYSTEM_CONTEXT}
+
+Investigate and fix this issue. When done, I'll send your response to Slack.`;
+
+  const tmpFile = `/tmp/claude-prompt-${Date.now()}.md`;
+  writeFileSync(tmpFile, prompt);
+
+  const claudeCmd = `cd ~/hermesagent-taskspine && claude -p "$(cat ${tmpFile})"`;
+
+  try {
+    spawn('kitty', ['--title', `Support: ${userName}`, 'bash', '-c', claudeCmd], {
       detached: true,
       stdio: 'ignore'
     }).unref();
-    console.log(chalk.green(`  ✓ Terminal spawned`));
+    console.log(chalk.green(`  ✓ Terminal spawned for human`));
   } catch (e) {
     console.log(chalk.yellow(`  ⚠ Terminal failed: ${e.message}`));
   }

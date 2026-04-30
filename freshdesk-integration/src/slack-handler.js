@@ -148,23 +148,23 @@ async function replyToSlack(event, text) {
 }
 
 function spawnTerminal(event, userName) {
-  const prompt = `## Slack Support — Needs Review
+  const prompt = `## Slack Support — Code Issue
 
 **From:** ${userName}
 **Message:** ${event.text}
 
-This was flagged as complex. Help me:
-1. Understand the issue
-2. Determine next steps
-3. Draft a response`;
+${SYSTEM_CONTEXT}
+
+Analyze this issue and help me fix it. After we solve it, draft a response to send back.`;
 
   const tmpFile = `/tmp/claude-prompt-${Date.now()}.md`;
   writeFileSync(tmpFile, prompt);
 
+  // Interactive session (no --print) so it stays open
   const claudeCmd = `claude -p "$(cat ${tmpFile})"`;
 
   try {
-    spawn('kitty', ['--hold', '--title', `Support: ${userName}`, 'bash', '-c', claudeCmd], {
+    spawn('kitty', ['--title', `Support: ${userName}`, 'bash', '-c', claudeCmd], {
       detached: true,
       stdio: 'ignore'
     }).unref();

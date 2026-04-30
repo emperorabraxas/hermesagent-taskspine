@@ -229,13 +229,21 @@ claude &
 CLAUDE_PID=$!
 
 # Wait for claude to initialize
-sleep 2
+sleep 3
 
-# Type the prompt using xdotool
-xdotool type --delay 5 "$(cat ${promptFile})"
-xdotool key Return
+# Try ydotool first (Wayland), fallback to wtype, then xdotool
+if command -v ydotool &> /dev/null; then
+  ydotool type "$(cat ${promptFile})"
+  ydotool key 28:1 28:0  # Enter key
+elif command -v wtype &> /dev/null; then
+  wtype -d 5 "$(cat ${promptFile})"
+  wtype -k Return
+elif command -v xdotool &> /dev/null; then
+  xdotool type --delay 5 "$(cat ${promptFile})"
+  xdotool key Return
+fi
 
-# Wait for claude to finish
+# Wait for claude
 wait $CLAUDE_PID
 `);
   execSync(`chmod +x ${scriptFile}`);

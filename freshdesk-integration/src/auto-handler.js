@@ -158,16 +158,6 @@ async function postToSlack(ticket, plan, isNew) {
           text: `*Plan:*\n${plan.map(s => `• ${s}`).join('\n')}`
         }
       },
-      {
-        type: 'actions',
-        elements: [
-          {
-            type: 'button',
-            text: { type: 'plain_text', text: '🔗 Open in Freshdesk', emoji: true },
-            url: `https://${process.env.FRESHDESK_DOMAIN}/a/tickets/${ticket.id}`
-          }
-        ]
-      }
     ]
   };
 
@@ -197,7 +187,6 @@ function spawnClaudeSession(ticket, prompt) {
     queue.push({
       ticketId: ticket.id,
       prompt,
-      link: `https://${process.env.FRESHDESK_DOMAIN}/a/tickets/${ticket.id}`,
       queuedAt: new Date().toISOString()
     });
     fs.writeFileSync(queueFile, JSON.stringify(queue, null, 2));

@@ -2,7 +2,8 @@
 import 'dotenv/config';
 import { WebClient } from '@slack/web-api';
 import { SocketModeClient } from '@slack/socket-mode';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
+import { writeFileSync, readFileSync, existsSync } from 'fs';
 import chalk from 'chalk';
 
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN;
@@ -18,217 +19,161 @@ const socketClient = new SocketModeClient({ appToken: SLACK_APP_TOKEN });
 
 const seenMessages = new Set();
 
+// Keywords that trigger support response
+const SUPPORT_KEYWORDS = [
+  'help', 'error', 'issue', 'broken', 'not working', 'bug', 'problem',
+  'cant', "can't", 'cannot', 'failed', 'failing', 'stuck', 'crash',
+  'how do i', 'how to', 'please', 'urgent', 'asap', 'need'
+];
+
 console.log(chalk.cyan('╔════════════════════════════════════════════╗'));
-console.log(chalk.cyan('║') + chalk.white.bold('  Slack → Claude Code Integration           ') + chalk.cyan('║'));
+console.log(chalk.cyan('║') + chalk.white.bold('  Slack Auto-Support Bot                    ') + chalk.cyan('║'));
 console.log(chalk.cyan('╚════════════════════════════════════════════╝'));
+console.log(chalk.gray(`Keywords: ${SUPPORT_KEYWORDS.slice(0, 5).join(', ')}...\n`));
 
 socketClient.on('message', async ({ event, ack }) => {
   await ack();
-
-  // Skip bot messages, message edits, and already-seen messages
   if (event.bot_id || event.subtype || seenMessages.has(event.ts)) return;
   seenMessages.add(event.ts);
 
-  // Get channel info
-  let channelName = event.channel;
-  try {
-    const info = await webClient.conversations.info({ channel: event.channel });
-    channelName = info.channel?.name || event.channel;
-  } catch {}
-
-  // Get user info
-  let userName = 'Unknown';
-  try {
-    const user = await webClient.users.info({ user: event.user });
-    userName = user.user?.real_name || user.user?.name || 'Unknown';
-  } catch {}
-
-  console.log(chalk.yellow(`\n🎫 Support request from ${userName} in #${channelName}`));
-  console.log(chalk.gray(`   "${event.text?.slice(0, 100)}${event.text?.length > 100 ? '...' : ''}"`));
-
-  const prompt = generatePrompt(event, userName, channelName);
-  spawnClaudeSession(event, prompt, userName, channelName);
+  await handleMessage(event);
 });
 
 socketClient.on('app_mention', async ({ event, ack }) => {
   await ack();
-
   if (seenMessages.has(event.ts)) return;
   seenMessages.add(event.ts);
 
-  let userName = 'Unknown';
-  try {
-    const user = await webClient.users.info({ user: event.user });
-    userName = user.user?.real_name || user.user?.name || 'Unknown';
-  } catch {}
-
-  let channelName = event.channel;
-  try {
-    const info = await webClient.conversations.info({ channel: event.channel });
-    channelName = info.channel?.name || event.channel;
-  } catch {}
-
-  console.log(chalk.yellow(`\n🔔 Mentioned by ${userName} in #${channelName}`));
-  console.log(chalk.gray(`   "${event.text?.slice(0, 100)}${event.text?.length > 100 ? '...' : ''}"`));
-
-  const prompt = generatePrompt(event, userName, channelName);
-  spawnClaudeSession(event, prompt, userName, channelName);
+  // Always respond to @mentions
+  await handleMessage(event, true);
 });
 
-function generatePrompt(event, userName, channelName) {
-  const plan = generatePlan(event.text || '');
+async function handleMessage(event, isMention = false) {
+  const text = event.text?.toLowerCase() || '';
 
-  return `## Slack Support Request
+  // Check if message matches support keywords (or is a mention)
+  const isSupport = isMention || SUPPORT_KEYWORDS.some(kw => text.includes(kw));
+  if (!isSupport) return;
+
+  // Get user info
+  let userName = 'there';
+  try {
+    const user = await webClient.users.info({ user: event.user });
+    userName = user.user?.real_name?.split(' ')[0] || user.user?.name || 'there';
+  } catch {}
+
+  console.log(chalk.yellow(`\n🎫 Support request from ${userName}`));
+  console.log(chalk.gray(`   "${event.text?.slice(0, 80)}${event.text?.length > 80 ? '...' : ''}"`));
+
+  // Determine complexity
+  const isComplex = needsHumanReview(event.text || '');
+
+  if (isComplex) {
+    console.log(chalk.cyan(`  → Complex issue, spawning terminal...`));
+    await replyToSlack(event, `Hey ${userName}! Looking into this now — I'll get back to you shortly.`);
+    spawnTerminal(event, userName);
+  } else {
+    console.log(chalk.cyan(`  → Generating auto-reply...`));
+    const response = await generateResponse(event.text || '', userName);
+    await replyToSlack(event, response);
+  }
+}
+
+function needsHumanReview(text) {
+  const lower = text.toLowerCase();
+  const complexIndicators = [
+    'code', 'deploy', 'production', 'database', 'server', 'api',
+    'urgent', 'asap', 'critical', 'down', 'outage', 'security',
+    'refund', 'billing', 'account', 'delete', 'cancel'
+  ];
+  return complexIndicators.some(kw => lower.includes(kw));
+}
+
+async function generateResponse(message, userName) {
+  const lower = message.toLowerCase();
+
+  // Login issues
+  if (lower.includes('login') || lower.includes('sign in') || lower.includes('password')) {
+    return `Hey ${userName}! For login issues, try these quick fixes:
+
+1. **Clear cookies** and try incognito mode
+2. **Reset password** via the "Forgot password" link
+3. **Check caps lock** — passwords are case-sensitive
+4. **Try a different browser**
+
+If still stuck, let me know what error you're seeing and I'll dig deeper.`;
+  }
+
+  // Error messages
+  if (lower.includes('error') || lower.includes('broken') || lower.includes('not working')) {
+    return `Hey ${userName}! Sorry you're hitting an error. To help track this down:
+
+1. What's the **exact error message**?
+2. What were you trying to do when it happened?
+3. Has this worked before, or is it new?
+
+A screenshot helps a lot if you can grab one!`;
+  }
+
+  // How-to questions
+  if (lower.includes('how do i') || lower.includes('how to') || lower.includes('?')) {
+    return `Hey ${userName}! Happy to help. Can you give me a bit more detail on what you're trying to accomplish? That way I can point you in the right direction.`;
+  }
+
+  // Feature requests
+  if (lower.includes('feature') || lower.includes('request') || lower.includes('add') || lower.includes('would be nice')) {
+    return `Hey ${userName}! Thanks for the suggestion — I've noted it down. Is there a specific workflow this would help with? Context helps prioritize.`;
+  }
+
+  // Generic fallback
+  return `Hey ${userName}! Got your message. What can I help you with?`;
+}
+
+async function replyToSlack(event, text) {
+  try {
+    await webClient.chat.postMessage({
+      channel: event.channel,
+      thread_ts: event.ts,
+      text
+    });
+    console.log(chalk.green(`  ✓ Replied in Slack`));
+  } catch (e) {
+    console.error(chalk.red(`  ✗ Failed to reply: ${e.message}`));
+  }
+}
+
+function spawnTerminal(event, userName) {
+  const prompt = `## Slack Support — Needs Review
 
 **From:** ${userName}
-**Channel:** #${channelName}
-**Time:** ${new Date(parseFloat(event.ts) * 1000).toLocaleString()}
+**Message:** ${event.text}
 
-### Message
-${event.text || '(no text)'}
+This was flagged as complex. Help me:
+1. Understand the issue
+2. Determine next steps
+3. Draft a response`;
 
-### Suggested Plan
-${plan.map((s, i) => `${i + 1}. ${s}`).join('\n')}
-
----
-
-Help me handle this support request:
-1. Understand what they need
-2. Draft a response
-3. If code changes needed, identify them`;
-}
-
-function generatePlan(text) {
-  const lower = text.toLowerCase();
-
-  if (lower.includes('error') || lower.includes('bug') || lower.includes('broken') || lower.includes('not working')) {
-    return ['Identify the error', 'Check for known issues', 'Draft fix or workaround'];
-  } else if (lower.includes('how') || lower.includes('help') || lower.includes('?')) {
-    return ['Understand the question', 'Research answer', 'Draft helpful response'];
-  } else if (lower.includes('feature') || lower.includes('request') || lower.includes('add')) {
-    return ['Document the request', 'Assess feasibility', 'Draft response'];
-  }
-  return ['Analyze request', 'Determine action needed', 'Draft response'];
-}
-
-import { writeFileSync, readFileSync, existsSync } from 'fs';
-import { execSync } from 'child_process';
-
-function spawnClaudeSession(event, prompt, userName, channelName) {
-  console.log(chalk.cyan(`  → Delivering to Claude Code...`));
-
-  // Queue for MCP (bonus - if they have polling set up)
-  tryInjectCurrentSession(prompt, userName, channelName);
-
-  // Primary: Spawn new terminal window
-  const spawned = trySpawnTerminal(prompt, userName);
-  if (spawned) return;
-
-  // Fallback: Open Claude Code web
-  tryOpenWeb(prompt, userName);
-}
-
-function tryInjectCurrentSession(prompt, userName, channelName) {
-  try {
-    const queueFile = process.env.CLAUDE_SESSION_FILE || '/tmp/claude-ticket-queue.json';
-
-    let queue = [];
-    if (existsSync(queueFile)) {
-      try { queue = JSON.parse(readFileSync(queueFile, 'utf8')); } catch {}
-    }
-
-    queue.push({
-      type: 'slack',
-      from: userName,
-      channel: channelName,
-      prompt,
-      queuedAt: new Date().toISOString()
-    });
-
-    writeFileSync(queueFile, JSON.stringify(queue, null, 2));
-
-    // Send desktop notification
-    try {
-      execSync(`notify-send -u critical "Support Request" "From ${userName} in #${channelName}" 2>/dev/null`);
-    } catch {}
-
-    console.log(chalk.green(`  ✓ Queued for current session + notified`));
-    return true;
-  } catch (e) {
-    console.log(chalk.yellow(`  ⚠ Could not queue: ${e.message}`));
-    return false;
-  }
-}
-
-function trySpawnTerminal(prompt, userName) {
-  // Write prompt to temp file to avoid shell escaping issues
   const tmpFile = `/tmp/claude-prompt-${Date.now()}.md`;
   writeFileSync(tmpFile, prompt);
 
-  const terminals = ['kitty', 'alacritty', 'wezterm', 'gnome-terminal', 'konsole', 'xterm'];
+  const claudeCmd = `claude -p "$(cat ${tmpFile})"`;
 
-  for (const term of terminals) {
-    try {
-      let args;
-      const claudeCmd = `claude -p "$(cat ${tmpFile})" || (echo "Claude crashed. Press enter to close." && read)`;
-
-      switch (term) {
-        case 'kitty':
-          args = ['--hold', '--title', `Slack: ${userName}`, 'bash', '-c', claudeCmd];
-          break;
-        case 'alacritty':
-          args = ['--title', `Slack: ${userName}`, '-e', 'bash', '-c', claudeCmd];
-          break;
-        case 'wezterm':
-          args = ['start', '--', 'bash', '-c', claudeCmd];
-          break;
-        case 'gnome-terminal':
-          args = ['--title', `Slack: ${userName}`, '--', 'bash', '-c', claudeCmd];
-          break;
-        case 'konsole':
-          args = ['-e', 'bash', '-c', claudeCmd];
-          break;
-        case 'xterm':
-          args = ['-title', `Slack: ${userName}`, '-e', 'bash', '-c', claudeCmd];
-          break;
-      }
-
-      spawn(term, args, { detached: true, stdio: 'ignore' }).unref();
-      console.log(chalk.green(`  ✓ New terminal spawned (${term})`));
-      return true;
-    } catch {}
-  }
-
-  return false;
-}
-
-function tryOpenWeb(prompt, userName) {
   try {
-    // Write prompt to temp file for reference
-    const tmpFile = `/tmp/claude-slack-${Date.now()}.md`;
-    writeFileSync(tmpFile, prompt);
-
-    // Open Claude Code web
-    const browsers = ['xdg-open', 'firefox', 'chromium', 'google-chrome'];
-    for (const browser of browsers) {
-      try {
-        spawn(browser, ['https://claude.ai/code'], { detached: true, stdio: 'ignore' }).unref();
-        console.log(chalk.green(`  ✓ Opened Claude Code web`));
-        console.log(chalk.gray(`    Prompt saved to: ${tmpFile}`));
-        return true;
-      } catch {}
-    }
+    spawn('kitty', ['--hold', '--title', `Support: ${userName}`, 'bash', '-c', claudeCmd], {
+      detached: true,
+      stdio: 'ignore'
+    }).unref();
+    console.log(chalk.green(`  ✓ Terminal spawned`));
   } catch (e) {
-    console.error(chalk.red(`  ✗ All methods failed: ${e.message}`));
+    console.log(chalk.yellow(`  ⚠ Terminal failed: ${e.message}`));
   }
-  return false;
 }
 
 (async () => {
   try {
     await socketClient.start();
     console.log(chalk.green('✓ Connected to Slack'));
-    console.log(chalk.gray('Listening for messages...\n'));
+    console.log(chalk.gray('Listening for support requests...\n'));
   } catch (error) {
     console.error(chalk.red('Failed to connect:'), error.message);
     process.exit(1);

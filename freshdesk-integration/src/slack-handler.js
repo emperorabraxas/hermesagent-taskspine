@@ -46,7 +46,7 @@ const SUPPORT_KEYWORDS = [
 ];
 
 console.log(chalk.cyan('╔════════════════════════════════════════════╗'));
-console.log(chalk.cyan('║') + chalk.white.bold('  Slack Auto-Support Bot                    ') + chalk.cyan('║'));
+console.log(chalk.cyan('║') + chalk.white.bold('  TicketsPlease                             ') + chalk.cyan('║'));
 console.log(chalk.cyan('╚════════════════════════════════════════════╝'));
 console.log(chalk.gray(`Keywords: ${SUPPORT_KEYWORDS.slice(0, 5).join(', ')}...\n`));
 
@@ -115,22 +115,25 @@ async function handleMessage(event, isMention = false) {
 async function analyzeWithClaude(message, userName) {
   const prompt = `${SYSTEM_CONTEXT}
 
-Analyze this support message and respond.
+Analyze this support message and decide how to handle it.
 
 Message from ${userName}: "${message}"
 
-Instructions:
-1. Determine if this requires code changes (Salesforce, AWS, UWM integration code) → set needsTerminal: true
-2. If it's a general question, login issue, or can be answered directly → provide a helpful response
-3. Keep responses concise and friendly
+Rules (follow exactly):
+1. If this requires code changes (Salesforce, AWS, UWM integration code) → needsTerminal: true
+2. Only set needsTerminal: false if you can answer COMPLETELY and DEFINITIVELY with zero missing context.
+3. If there is ANY uncertainty, vagueness, or missing info → needsTerminal: true.
+4. NEVER put a question in the "response" field. The response field is for complete final answers only.
+5. If you have questions, put them in the "questions" field and set needsTerminal: true.
+6. When in doubt, escalate. Do not ask the submitter for clarification.
 
 Respond in this exact JSON format only, no other text:
 
-If you can FULLY answer/solve without needing any more information:
-{"needsTerminal": false, "response": "Your complete solution/answer"}
+If you can FULLY answer without needing anything else:
+{"needsTerminal": false, "response": "Your complete answer here"}
 
-If you need ANY additional info, clarification, or aren't 100% sure:
-{"needsTerminal": true, "response": "I'm escalating this to the team.", "questions": "What you need to investigate"}`;
+If there is ANY uncertainty or missing info:
+{"needsTerminal": true, "questions": "What specifically needs investigation"}`;
 
   try {
     const tmpFile = `/tmp/claude-analyze-${Date.now()}.txt`;
@@ -145,19 +148,24 @@ If you need ANY additional info, clarification, or aren't 100% sure:
     const jsonMatch = result.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
+      // Safety net: if response contains a question mark, force-escalate
+      if (!parsed.needsTerminal && parsed.response?.includes('?')) {
+        return { needsTerminal: true, questions: parsed.response };
+      }
       return {
         needsTerminal: parsed.needsTerminal || false,
-        response: parsed.response || `Hey ${userName}! Got your message, looking into it.`
+        response: parsed.response || `Hey ${userName}! I'm escalating this to the team — someone will follow up shortly.`,
+        questions: parsed.questions
       };
     }
   } catch (e) {
     console.log(chalk.yellow(`  ⚠ Claude analysis failed: ${e.message}`));
   }
 
-  // Fallback
+  // Fallback — always escalate, never ask submitter for more info
   return {
-    needsTerminal: false,
-    response: `Hey ${userName}! Got your message. Can you give me a bit more detail?`
+    needsTerminal: true,
+    questions: 'Could not analyze — needs human review'
   };
 }
 

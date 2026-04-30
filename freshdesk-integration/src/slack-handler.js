@@ -48,6 +48,18 @@ socketClient.on('app_mention', async ({ event, ack }) => {
   await handleMessage(event, true);
 });
 
+// System context for Claude
+const SYSTEM_CONTEXT = `You are a support bot for a Salesforce-AWS-UWM integration system.
+
+Stack context:
+- Salesforce LWC components (Lightning Web Components)
+- AWS Lambda functions
+- UWM (United Wholesale Mortgage) API integration
+- Auth token handling and refresh flows
+- Loan processing workflows
+
+Your job is to analyze support messages and respond appropriately.`;
+
 async function handleMessage(event, isMention = false) {
   const text = event.text?.toLowerCase() || '';
 
@@ -65,70 +77,61 @@ async function handleMessage(event, isMention = false) {
   console.log(chalk.yellow(`\n🎫 Support request from ${userName}`));
   console.log(chalk.gray(`   "${event.text?.slice(0, 80)}${event.text?.length > 80 ? '...' : ''}"`));
 
-  // Check if it's a code issue that needs terminal
-  const codeIssue = needsTerminal(event.text || '');
+  // Use Claude to analyze and respond
+  const analysis = await analyzeWithClaude(event.text || '', userName);
 
-  if (codeIssue) {
-    console.log(chalk.cyan(`  → Code issue, spawning terminal...`));
+  if (analysis.needsTerminal) {
+    console.log(chalk.cyan(`  → Code issue detected, spawning terminal...`));
     await replyToSlack(event, `Hey ${userName}! Looking into this now — I'll get back to you shortly.`);
     spawnTerminal(event, userName);
   } else {
-    console.log(chalk.cyan(`  → Generating auto-reply...`));
-    const response = await generateResponse(event.text || '', userName);
-    await replyToSlack(event, response);
+    console.log(chalk.cyan(`  → Auto-replying...`));
+    await replyToSlack(event, analysis.response);
   }
 }
 
-function needsTerminal(text) {
-  const lower = text.toLowerCase();
-  // Only open terminal for issues Claude Code can actually solve
-  const codeIssues = [
-    'code', 'bug', 'deploy', 'api', 'server', 'database', 'function',
-    'script', 'error log', 'stack trace', 'exception', 'crash',
-    'build', 'compile', 'git', 'repo', 'branch', 'merge', 'commit',
-    'test', 'failing test', 'ci', 'pipeline', 'docker', 'container'
-  ];
-  return codeIssues.some(kw => lower.includes(kw));
-}
+async function analyzeWithClaude(message, userName) {
+  const prompt = `${SYSTEM_CONTEXT}
 
-async function generateResponse(message, userName) {
-  const lower = message.toLowerCase();
+Analyze this support message and respond.
 
-  // Login issues
-  if (lower.includes('login') || lower.includes('sign in') || lower.includes('password')) {
-    return `Hey ${userName}! For login issues, try these quick fixes:
+Message from ${userName}: "${message}"
 
-1. **Clear cookies** and try incognito mode
-2. **Reset password** via the "Forgot password" link
-3. **Check caps lock** — passwords are case-sensitive
-4. **Try a different browser**
+Instructions:
+1. Determine if this requires code changes (Salesforce, AWS, UWM integration code) → set needsTerminal: true
+2. If it's a general question, login issue, or can be answered directly → provide a helpful response
+3. Keep responses concise and friendly
 
-If still stuck, let me know what error you're seeing and I'll dig deeper.`;
+Respond in this exact JSON format only, no other text:
+{"needsTerminal": true/false, "response": "your response here"}`;
+
+  try {
+    const tmpFile = `/tmp/claude-analyze-${Date.now()}.txt`;
+    writeFileSync(tmpFile, prompt);
+
+    const result = execSync(`claude --print -p "$(cat ${tmpFile})" 2>/dev/null`, {
+      encoding: 'utf8',
+      timeout: 30000
+    }).trim();
+
+    // Parse JSON from response
+    const jsonMatch = result.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        needsTerminal: parsed.needsTerminal || false,
+        response: parsed.response || `Hey ${userName}! Got your message, looking into it.`
+      };
+    }
+  } catch (e) {
+    console.log(chalk.yellow(`  ⚠ Claude analysis failed: ${e.message}`));
   }
 
-  // Error messages
-  if (lower.includes('error') || lower.includes('broken') || lower.includes('not working')) {
-    return `Hey ${userName}! Sorry you're hitting an error. To help track this down:
-
-1. What's the **exact error message**?
-2. What were you trying to do when it happened?
-3. Has this worked before, or is it new?
-
-A screenshot helps a lot if you can grab one!`;
-  }
-
-  // How-to questions
-  if (lower.includes('how do i') || lower.includes('how to') || lower.includes('?')) {
-    return `Hey ${userName}! Happy to help. Can you give me a bit more detail on what you're trying to accomplish? That way I can point you in the right direction.`;
-  }
-
-  // Feature requests
-  if (lower.includes('feature') || lower.includes('request') || lower.includes('add') || lower.includes('would be nice')) {
-    return `Hey ${userName}! Thanks for the suggestion — I've noted it down. Is there a specific workflow this would help with? Context helps prioritize.`;
-  }
-
-  // Generic fallback
-  return `Hey ${userName}! Got your message. What can I help you with?`;
+  // Fallback
+  return {
+    needsTerminal: false,
+    response: `Hey ${userName}! Got your message. Can you give me a bit more detail?`
+  };
 }
 
 async function replyToSlack(event, text) {

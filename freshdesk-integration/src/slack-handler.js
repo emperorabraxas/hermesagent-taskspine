@@ -117,27 +117,15 @@ import { execSync } from 'child_process';
 function spawnClaudeSession(event, prompt, userName, channelName) {
   console.log(chalk.cyan(`  → Delivering to Claude Code...`));
 
-  // PRIORITY 1: Inject into current session (if claude is running)
-  if (isClaudeRunning()) {
-    const injected = tryInjectCurrentSession(prompt, userName, channelName);
-    if (injected) return;
-  }
+  // Queue for MCP (bonus - if they have polling set up)
+  tryInjectCurrentSession(prompt, userName, channelName);
 
-  // PRIORITY 2: Spawn new terminal window
+  // Primary: Spawn new terminal window
   const spawned = trySpawnTerminal(prompt, userName);
   if (spawned) return;
 
-  // PRIORITY 3: Open Claude Code web
+  // Fallback: Open Claude Code web
   tryOpenWeb(prompt, userName);
-}
-
-function isClaudeRunning() {
-  try {
-    execSync('pgrep -x claude', { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function tryInjectCurrentSession(prompt, userName, channelName) {

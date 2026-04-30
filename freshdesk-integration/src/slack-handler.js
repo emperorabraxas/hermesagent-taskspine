@@ -160,11 +160,11 @@ Analyze this issue and help me fix it. After we solve it, draft a response to se
   const tmpFile = `/tmp/claude-prompt-${Date.now()}.md`;
   writeFileSync(tmpFile, prompt);
 
-  // Interactive session (no --print) so it stays open
-  const claudeCmd = `claude -p "$(cat ${tmpFile})"`;
+  // Interactive session - show errors if it fails
+  const claudeCmd = `cat ${tmpFile} && echo "---" && claude -p "$(cat ${tmpFile})" || (echo "ERROR: Claude exited with code $?"; read -p "Press enter to close...")`;
 
   try {
-    spawn('kitty', ['--title', `Support: ${userName}`, 'bash', '-c', claudeCmd], {
+    spawn('kitty', ['--hold', '--title', `Support: ${userName}`, 'bash', '-c', claudeCmd], {
       detached: true,
       stdio: 'ignore'
     }).unref();

@@ -35,8 +35,8 @@ function detectCodeIssue(text) {
 // Team routing
 const MILAD_HANDLE = 'Milad Romaya';
 const JOE_HANDLE = 'Joseph DeMasse';
-let MILAD_ID = null;
-let JOE_ID = null;
+let MILAD_ID = 'U06HUEDMPU1';
+let JOE_ID = 'U093L2520MP';
 
 // Keywords that trigger support response
 const SUPPORT_KEYWORDS = [

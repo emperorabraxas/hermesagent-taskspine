@@ -221,7 +221,6 @@ function spawnTerminal(event, userName, reason = '') {
 
   // Use tmux to send text reliably
   const sessionName = `support-${Date.now()}`;
-  const prompt = readFileSync(promptFile, 'utf8');
 
   try {
     // Create tmux session running claude

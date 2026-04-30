@@ -1,0 +1,14 @@
+[Unit]
+Description=Freshdesk Auto-Handler for Claude Code
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/user/hermesagent-taskspine/freshdesk-integration
+ExecStart=/usr/bin/node src/auto-handler.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target

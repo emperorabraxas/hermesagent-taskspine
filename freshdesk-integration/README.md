@@ -1,86 +1,76 @@
 # Freshdesk → Claude Code Integration
 
-Integrates Freshdesk support tickets directly with your Claude Code terminal session.
+Automatically injects support tickets into your Claude Code session with plans and Freshdesk links.
 
-## Setup
+## Quick Setup
 
-1. **Create Freshdesk account** at [freshdesk.com](https://freshdesk.com) (free tier works)
+1. **Create Freshdesk account** at [freshdesk.com](https://freshdesk.com) (free tier)
 
-2. **Get your API key:**
-   - Freshdesk → Profile Settings → API Key
+2. **Get your API key:** Freshdesk → Profile Settings → API Key
 
-3. **Configure environment:**
+3. **Configure:**
    ```bash
    cd freshdesk-integration
    cp .env.example .env
-   # Edit .env with your domain and API key
-   ```
-
-4. **Install dependencies:**
-   ```bash
+   # Add: FRESHDESK_DOMAIN=yourcompany.freshdesk.com
+   # Add: FRESHDESK_API_KEY=your_key
    npm install
    ```
 
-## Usage
+4. **Add MCP server to Claude Code** (`~/.claude/settings.json`):
+   ```json
+   {
+     "mcpServers": {
+       "freshdesk": {
+         "command": "node",
+         "args": ["mcp-server/index.js"],
+         "cwd": "/home/user/hermesagent-taskspine/freshdesk-integration"
+       }
+     }
+   }
+   ```
 
-### Option 1: Polling Daemon (Push-based)
+5. **Enable auto-polling in your session:**
+   ```
+   /loop 5m check for new Freshdesk tickets and show me any with their plans + links
+   ```
 
-Run in a separate terminal — tickets appear automatically:
+## What Happens
 
-```bash
-npm run poll
-```
+When a ticket comes in, Claude will automatically:
+- Show ticket details (subject, priority, description)
+- Generate a plan (bug fix, how-to, feature request, etc.)
+- Post the Freshdesk link: `https://yourcompany.freshdesk.com/a/tickets/123`
 
-When a new/updated ticket arrives, you'll see a notification with:
-- Ticket details
-- Suggested plan
-- Command to handle it
+You click the link, handle it, done.
 
-Then run:
-```bash
-npm run plan -- <ticket_id>          # Show the plan
-npm run plan -- <ticket_id> execute  # Launch Claude Code with context
-```
+## Manual Commands
 
-### Option 2: MCP Server (Pull-based)
-
-Add to your Claude Code settings (`~/.claude/settings.json`):
-
-```json
-{
-  "mcpServers": {
-    "freshdesk": {
-      "command": "node",
-      "args": ["mcp-server/index.js"],
-      "cwd": "/path/to/freshdesk-integration"
-    }
-  }
-}
-```
-
-Then in Claude Code, you can ask:
-- "List my open tickets"
+In your Claude Code session, just ask:
+- "Check my tickets"
 - "Get ticket #123"
-- "Reply to ticket #456 with..."
-- "What's urgent in my queue?"
+- "Reply to ticket #456 with [message]"
+- "What's urgent?"
 
-## Available MCP Tools
+## Background Service (Optional)
+
+For 24/7 monitoring with Slack notifications:
+```bash
+# Install service
+cp freshdesk-handler.service ~/.config/systemd/user/
+systemctl --user enable freshdesk-handler
+systemctl --user start freshdesk-handler
+```
+
+Add `SLACK_WEBHOOK_URL` to `.env` for Slack notifications.
+
+## MCP Tools
 
 | Tool | Description |
 |------|-------------|
 | `list_tickets` | List recent tickets |
-| `get_ticket` | Get full ticket with conversation history |
-| `add_private_note` | Add internal note (not visible to customer) |
+| `get_ticket` | Get full ticket + conversation |
 | `reply_to_ticket` | Send reply to customer |
+| `add_private_note` | Internal note (hidden from customer) |
 | `update_ticket_status` | Change status/priority |
-| `get_new_tickets` | Get recently updated tickets |
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `FRESHDESK_DOMAIN` | Your Freshdesk domain (e.g., `yourcompany.freshdesk.com`) |
-| `FRESHDESK_API_KEY` | Your API key from profile settings |
-| `POLL_INTERVAL_MS` | Polling interval in ms (default: 30000) |
-| `CLAUDE_SESSION_FILE` | Queue file path (default: `/tmp/claude-ticket-queue.json`) |
-| `NOTIFY_SOUND` | Play sound on new tickets (default: false) |
+| `get_new_tickets` | Tickets from last N minutes |

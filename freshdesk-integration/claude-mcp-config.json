@@ -3,11 +3,11 @@
     "freshdesk": {
       "command": "node",
       "args": ["mcp-server/index.js"],
-      "cwd": "/home/user/hermesagent-taskspine/freshdesk-integration",
-      "env": {
-        "FRESHDESK_DOMAIN": "${FRESHDESK_DOMAIN}",
-        "FRESHDESK_API_KEY": "${FRESHDESK_API_KEY}"
-      }
+      "cwd": "/home/user/hermesagent-taskspine/freshdesk-integration"
     }
   }
 }
+
+// Add this block to your ~/.claude/settings.json
+// Then use: /loop 5m check tickets
+// I'll automatically check every 5 min and tell you about new ones

@@ -146,7 +146,7 @@ async function replyToSlack(event, text) {
   }
 }
 
-async function tryAutoSolve(event, userName) {
+function tryAutoSolve(event, userName) {
   const responseFile = `/tmp/claude-response-${Date.now()}.json`;
 
   const prompt = `${SYSTEM_CONTEXT}
@@ -167,47 +167,53 @@ If you need more info from the user:
 {"solved": false, "response": "Your follow-up questions", "needsHuman": false}
 
 If you need human developer help:
-{"solved": false, "response": "Brief status to tell user", "needsHuman": true, "reason": "why you need help"}
-
-Output the JSON to: ${responseFile}`;
+{"solved": false, "response": "Brief status to tell user", "needsHuman": true, "reason": "why you need help"}`;
 
   const tmpFile = `/tmp/claude-prompt-${Date.now()}.md`;
   writeFileSync(tmpFile, prompt);
 
-  console.log(chalk.cyan(`  → Claude investigating...`));
+  console.log(chalk.cyan(`  → Claude investigating in background...`));
 
-  try {
-    // Run claude with --print to get response, working from repo root
-    execSync(`cd ~/hermesagent-taskspine && claude --print -p "$(cat ${tmpFile})" > ${responseFile} 2>&1`, {
-      timeout: 120000,
-      encoding: 'utf8'
-    });
+  // Run in background
+  const claude = spawn('bash', ['-c', `cd ~/hermesagent-taskspine && claude --print -p "$(cat ${tmpFile})"`], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
 
-    // Read and parse response
-    const output = readFileSync(responseFile, 'utf8');
-    const jsonMatch = output.match(/\{[\s\S]*"solved"[\s\S]*\}/);
+  let output = '';
+  claude.stdout.on('data', (data) => { output += data.toString(); });
+  claude.stderr.on('data', (data) => { output += data.toString(); });
 
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
+  claude.on('close', async (code) => {
+    console.log(chalk.cyan(`  → Claude finished (exit ${code})`));
 
-      if (result.needsHuman) {
-        console.log(chalk.yellow(`  → Needs human help: ${result.reason}`));
-        await replyToSlack(event, result.response || `Hey ${userName}! Looking into this — someone will follow up shortly.`);
-        spawnTerminal(event, userName, result.reason);
-      } else {
-        console.log(chalk.green(`  ✓ Auto-resolved`));
-        await replyToSlack(event, result.response);
+    try {
+      const jsonMatch = output.match(/\{[\s\S]*"solved"[\s\S]*\}/);
+
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+
+        if (result.needsHuman) {
+          console.log(chalk.yellow(`  → Needs human: ${result.reason}`));
+          await replyToSlack(event, result.response || `Hey ${userName}! Looking into this — will follow up shortly.`);
+          spawnTerminal(event, userName, result.reason);
+          // Desktop notification
+          try { execSync(`notify-send -u critical "Support needs you" "${result.reason}"`); } catch {}
+        } else {
+          console.log(chalk.green(`  ✓ Auto-resolved, sending to Slack`));
+          await replyToSlack(event, result.response);
+        }
+        return;
       }
-      return;
+    } catch (e) {
+      console.log(chalk.yellow(`  ⚠ Parse failed: ${e.message}`));
     }
-  } catch (e) {
-    console.log(chalk.yellow(`  ⚠ Auto-solve failed: ${e.message}`));
-  }
 
-  // Fallback - open terminal
-  console.log(chalk.yellow(`  → Falling back to terminal`));
-  await replyToSlack(event, `Hey ${userName}! Looking into this now.`);
-  spawnTerminal(event, userName, 'Auto-solve failed');
+    // Fallback
+    console.log(chalk.yellow(`  → Couldn't parse response, opening terminal`));
+    await replyToSlack(event, `Hey ${userName}! Looking into this.`);
+    spawnTerminal(event, userName, 'Auto-solve unclear');
+    try { execSync(`notify-send -u critical "Support needs you" "Auto-solve unclear"`); } catch {}
+  });
 }
 
 function spawnTerminal(event, userName, reason = '') {

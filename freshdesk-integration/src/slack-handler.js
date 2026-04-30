@@ -18,6 +18,25 @@ const webClient = new WebClient(SLACK_BOT_TOKEN);
 const socketClient = new SocketModeClient({ appToken: SLACK_APP_TOKEN });
 
 const seenMessages = new Set();
+const pendingApprovals = new Map(); // messageTs -> ticket data
+
+// Detect if issue is code-related (goes to Robert) or general (goes to Joe)
+function detectCodeIssue(text) {
+  const lower = text.toLowerCase();
+  const codeKeywords = [
+    'code', 'bug', 'error', 'api', 'deploy', 'server', 'database', 'function',
+    'lambda', 'salesforce', 'apex', 'lwc', 'uwm', 'integration', 'import',
+    'export', 'sync', 'auth', 'token', 'login', 'crash', 'exception',
+    'build', 'git', 'commit', 'merge', 'test', 'ci', 'pipeline', 'aws'
+  ];
+  return codeKeywords.some(kw => lower.includes(kw));
+}
+
+// Team routing
+const MILAD_HANDLE = 'Milad Romaya';
+const JOE_HANDLE = 'Joseph DeMasse';
+let MILAD_ID = null;
+let JOE_ID = null;
 
 // Keywords that trigger support response
 const SUPPORT_KEYWORDS = [
@@ -81,10 +100,12 @@ async function handleMessage(event, isMention = false) {
   const analysis = await analyzeWithClaude(event.text || '', userName);
 
   if (analysis.needsTerminal) {
-    console.log(chalk.cyan(`  → Needs investigation, escalating...`));
+    console.log(chalk.cyan(`  → Needs investigation, sending to Milad for approval...`));
     await replyToSlack(event, `Hey ${userName}! I'm escalating this to the team — someone will follow up shortly.`);
-    spawnTerminal(event, userName, analysis.questions || 'Needs investigation');
-    try { execSync(`notify-send -u critical "Support escalated" "${event.text?.slice(0, 50)}..."`); } catch {}
+
+    // Determine if code issue or general issue
+    const isCodeIssue = detectCodeIssue(event.text || '');
+    await dmMiladForApproval(event, userName, analysis.questions || 'Needs investigation', isCodeIssue);
   } else {
     console.log(chalk.cyan(`  → Auto-replying...`));
     await replyToSlack(event, analysis.response);
@@ -257,10 +278,104 @@ function spawnTerminal(event, userName, reason = '') {
   }
 }
 
+// Handle reaction approvals
+socketClient.on('reaction_added', async ({ event, ack }) => {
+  await ack();
+
+  // Check if this is an approval reaction on a pending ticket
+  const ticket = pendingApprovals.get(event.item.ts);
+  if (!ticket) return;
+
+  if (event.reaction === '+1' || event.reaction === 'thumbsup') {
+    console.log(chalk.green(`  ✓ Ticket approved by Milad`));
+    pendingApprovals.delete(event.item.ts);
+
+    // Route based on ticket type
+    if (ticket.isCodeIssue) {
+      console.log(chalk.cyan(`  → Routing to terminal (code issue)`));
+      spawnTerminal(ticket.event, ticket.userName, ticket.reason);
+      try { execSync(`notify-send -u critical "Support approved" "${ticket.event.text?.slice(0, 50)}..."`); } catch {}
+    } else {
+      console.log(chalk.cyan(`  → Routing to Joe (non-code issue)`));
+      await dmJoe(ticket);
+    }
+  } else if (event.reaction === '-1' || event.reaction === 'thumbsdown') {
+    console.log(chalk.yellow(`  → Ticket rejected by Milad`));
+    pendingApprovals.delete(event.item.ts);
+    await replyToSlack(ticket.event, `Update: We've reviewed your request and will follow up if needed.`);
+  }
+});
+
+async function lookupUsers() {
+  try {
+    const result = await webClient.users.list();
+    for (const user of result.members) {
+      if (user.real_name === MILAD_HANDLE || user.profile?.real_name === MILAD_HANDLE) {
+        MILAD_ID = user.id;
+        console.log(chalk.gray(`Found Milad: ${MILAD_ID}`));
+      }
+      if (user.real_name === JOE_HANDLE || user.profile?.real_name === JOE_HANDLE) {
+        JOE_ID = user.id;
+        console.log(chalk.gray(`Found Joe: ${JOE_ID}`));
+      }
+    }
+  } catch (e) {
+    console.log(chalk.yellow(`Could not lookup users: ${e.message}`));
+  }
+}
+
+async function dmMiladForApproval(event, userName, reason, isCodeIssue) {
+  if (!MILAD_ID) {
+    console.log(chalk.yellow(`  ⚠ Milad ID not found, routing directly`));
+    if (isCodeIssue) {
+      spawnTerminal(event, userName, reason);
+    } else {
+      await dmJoe({ event, userName, reason });
+    }
+    return;
+  }
+
+  try {
+    const routeTo = isCodeIssue ? 'Robert (terminal)' : 'Joe (DM)';
+    const result = await webClient.chat.postMessage({
+      channel: MILAD_ID,
+      text: `🎫 *New Support Request*\n\n*From:* ${userName}\n*Message:* ${event.text}\n*Reason:* ${reason}\n*Route to:* ${routeTo}\n\nReact 👍 to approve, 👎 to reject.`
+    });
+
+    // Store for reaction handling
+    pendingApprovals.set(result.ts, { event, userName, reason, isCodeIssue });
+    console.log(chalk.green(`  ✓ Sent to Milad for approval`));
+  } catch (e) {
+    console.log(chalk.yellow(`  ⚠ Could not DM Milad: ${e.message}`));
+    // Fallback - route directly
+    if (isCodeIssue) {
+      spawnTerminal(event, userName, reason);
+    }
+  }
+}
+
+async function dmJoe(ticket) {
+  if (!JOE_ID) {
+    console.log(chalk.yellow(`  ⚠ Joe ID not found`));
+    return;
+  }
+
+  try {
+    await webClient.chat.postMessage({
+      channel: JOE_ID,
+      text: `🎫 *Support Request Assigned to You*\n\n*From:* ${ticket.userName}\n*Message:* ${ticket.event.text}\n*Notes:* ${ticket.reason}\n\nPlease follow up with the customer.`
+    });
+    console.log(chalk.green(`  ✓ Sent to Joe`));
+  } catch (e) {
+    console.log(chalk.yellow(`  ⚠ Could not DM Joe: ${e.message}`));
+  }
+}
+
 (async () => {
   try {
     await socketClient.start();
     console.log(chalk.green('✓ Connected to Slack'));
+    await lookupUsers();
     console.log(chalk.gray('Listening for support requests...\n'));
   } catch (error) {
     console.error(chalk.red('Failed to connect:'), error.message);

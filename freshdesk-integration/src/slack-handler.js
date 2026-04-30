@@ -230,7 +230,8 @@ function spawnTerminal(event, userName, reason = '') {
     setTimeout(() => {
       try {
         // Send the prompt text
-        execSync(`tmux send-keys -t ${sessionName} ${JSON.stringify(prompt)} Enter`);
+        execSync(`tmux send-keys -t ${sessionName} -l ${JSON.stringify(prompt)}`);
+        execSync(`tmux send-keys -t ${sessionName} Enter`);
         console.log(chalk.green(`  ✓ Prompt sent to Claude`));
       } catch (e) {
         console.log(chalk.yellow(`  ⚠ Could not send text: ${e.message}`));

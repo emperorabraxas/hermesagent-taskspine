@@ -174,7 +174,7 @@ function trySpawnTerminal(prompt, userName) {
 
       switch (term) {
         case 'kitty':
-          args = ['--title', `Slack: ${userName}`, 'bash', '-c', claudeCmd];
+          args = ['--hold', '--title', `Slack: ${userName}`, 'bash', '-c', claudeCmd];
           break;
         case 'alacritty':
           args = ['--title', `Slack: ${userName}`, '-e', 'bash', '-c', claudeCmd];
